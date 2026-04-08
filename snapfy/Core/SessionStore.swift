@@ -6,6 +6,7 @@ protocol AuthManaging {
     @MainActor var currentUser: AuthenticatedUser? { get }
     @MainActor func restoreSession() throws
     @MainActor func signUp(_ payload: SignUpPayload) throws
+    @MainActor func updateProfile(displayName: String, profileImageData: Data?) throws
     @MainActor func signOut()
 }
 
@@ -73,6 +74,45 @@ final class SessionStore: ObservableObject, AuthManaging {
 
         UserDefaults.standard.set(user.id.uuidString, forKey: currentUserDefaultsKey)
         currentUser = AuthenticatedUser(
+            id: user.id,
+            displayName: user.displayName,
+            profileImageData: user.profileImageData
+        )
+    }
+
+    func updateProfile(displayName: String, profileImageData: Data?) throws {
+        guard let currentUser else {
+            throw AuthError.userNotFound
+        }
+        let currentUserID = currentUser.id
+
+        let trimmedDisplayName = displayName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmedDisplayName.count >= 2 else {
+            throw AuthError.invalidDisplayName
+        }
+
+        let context = ModelContext(container)
+        var descriptor = FetchDescriptor<UserAccount>(
+            predicate: #Predicate { $0.id == currentUserID }
+        )
+        descriptor.fetchLimit = 1
+
+        guard let user = try context.fetch(descriptor).first else {
+            throw AuthError.userNotFound
+        }
+
+        user.displayName = trimmedDisplayName
+        user.profileImageData = profileImageData
+
+        do {
+            try context.save()
+        } catch {
+            throw AuthError.unknown
+        }
+
+        self.currentUser = AuthenticatedUser(
             id: user.id,
             displayName: user.displayName,
             profileImageData: user.profileImageData

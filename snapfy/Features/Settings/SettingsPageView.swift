@@ -2,12 +2,10 @@ import SwiftUI
 
 struct SettingsPageView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @State private var isPresentingProfileEdit = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("프로필")
-                .font(.largeTitle.bold())
-
             if let currentUser = sessionStore.currentUser {
                 HStack(spacing: 16) {
                     ProfileAvatarView(
@@ -18,13 +16,18 @@ struct SettingsPageView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(currentUser.displayName)
                             .font(.title3.bold())
-                        Text("로컬 온보딩 계정")
-                            .foregroundStyle(.secondary)
                     }
+
+                    Spacer()
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+
+                Button("프로필 변경") {
+                    isPresentingProfileEdit = true
+                }
+                .buttonStyle(.borderedProminent)
 
                 Button("로그아웃") {
                     sessionStore.signOut()
@@ -43,6 +46,12 @@ struct SettingsPageView: View {
         .padding(24)
         .navigationTitle("프로필")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $isPresentingProfileEdit) {
+            if let currentUser = sessionStore.currentUser {
+                ProfileEditView(currentUser: currentUser)
+                    .environmentObject(sessionStore)
+            }
+        }
     }
 }
 
