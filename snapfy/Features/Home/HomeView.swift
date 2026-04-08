@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Binding var selectedTab: AppTab
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -13,28 +15,28 @@ struct HomeView: View {
                 }
 
                 VStack(spacing: 16) {
-                    HomeNavigationCard(
+                    HomeTabCard(
                         title: "캘린더",
                         subtitle: "날짜별 사진과 비디오를 모아보는 메인 화면",
                         systemImage: "calendar"
                     ) {
-                        CalendarPageView()
+                        selectedTab = .calendar
                     }
 
-                    HomeNavigationCard(
+                    HomeTabCard(
                         title: "최근 미디어",
                         subtitle: "최근 업로드한 사진과 비디오를 빠르게 확인",
                         systemImage: "photo.stack"
                     ) {
-                        LibraryPageView()
+                        selectedTab = .library
                     }
 
-                    HomeNavigationCard(
+                    HomeTabCard(
                         title: "공간 설정",
                         subtitle: "공간 정보와 설정 항목을 정리할 페이지",
                         systemImage: "gearshape"
                     ) {
-                        SettingsPageView()
+                        selectedTab = .settings
                     }
                 }
             }
@@ -44,28 +46,14 @@ struct HomeView: View {
     }
 }
 
-private struct HomeNavigationCard<Destination: View>: View {
+private struct HomeTabCard: View {
     let title: String
     let subtitle: String
     let systemImage: String
-    @ViewBuilder let destination: Destination
-
-    init(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        @ViewBuilder destination: () -> Destination
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.systemImage = systemImage
-        self.destination = destination()
-    }
+    let action: () -> Void
 
     var body: some View {
-        NavigationLink {
-            destination
-        } label: {
+        Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: systemImage)
                     .font(.title2)
@@ -99,6 +87,6 @@ private struct HomeNavigationCard<Destination: View>: View {
 
 #Preview {
     NavigationStack {
-        HomeView()
+        HomeView(selectedTab: .constant(.home))
     }
 }
