@@ -207,7 +207,7 @@ private struct CalendarDayCell: View {
 
                     Text(CalendarDateUtils.dayNumber(for: day))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
+                        .foregroundStyle(dayNumberColor)
                         .padding(10)
                 }
                 .frame(width: cellSize.width, height: cellSize.height)
@@ -217,6 +217,18 @@ private struct CalendarDayCell: View {
             .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         }
         .buttonStyle(.plain)
+    }
+
+    private var dayNumberColor: Color {
+        if CalendarDateUtils.isToday(day) {
+            return .blue
+        }
+
+        if Calendar.current.component(.weekday, from: day) == 1 {
+            return .red
+        }
+
+        return isCurrentMonth ? .primary : .tertiary
     }
 
     private var borderColor: Color {
