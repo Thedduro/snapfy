@@ -73,12 +73,17 @@ struct CalendarPageView: View {
                         )
                     }
                 }
+
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: 160)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showingMediaOptions = false
+                    }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 16)
         }
-        .navigationTitle("캘린더")
-        .navigationBarTitleDisplayMode(.inline)
         .onChange(of: displayedMonth) { _, newValue in
             if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
                 selectedDate = newValue
@@ -186,7 +191,7 @@ private struct CalendarDayCell: View {
 
                 ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(isSelected ? Color.blue.opacity(0.12) : Color(.secondarySystemBackground))
+                        .fill(isSelected ? Color.black.opacity(0.14) : Color(.secondarySystemBackground))
 
                     if let thumbnailData,
                        let image = UIImage(data: thumbnailData) {
@@ -199,7 +204,7 @@ private struct CalendarDayCell: View {
                     }
 
                     RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(borderColor, lineWidth: isSelected || CalendarDateUtils.isToday(day) ? 2 : 0)
+                        .stroke(borderColor, lineWidth: isSelected ? 2 : 0)
 
                     Text(CalendarDateUtils.dayNumber(for: day))
                         .font(.caption.weight(.semibold))
@@ -253,11 +258,7 @@ private struct CalendarDayCell: View {
 
     private var borderColor: Color {
         if isSelected {
-            return .blue
-        }
-
-        if CalendarDateUtils.isToday(day) {
-            return .accentColor
+            return Color.black.opacity(0.35)
         }
 
         return .clear
