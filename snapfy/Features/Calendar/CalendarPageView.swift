@@ -31,14 +31,14 @@ struct CalendarPageView: View {
     @State private var showingMediaOptions = false
     @State private var activeSource: MediaSource?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
                 monthHeader
 
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(CalendarDateUtils.weekdaySymbols(), id: \.self) { symbol in
                         Text(symbol)
                             .font(.caption.weight(.semibold))
@@ -61,7 +61,8 @@ struct CalendarPageView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
         }
         .navigationTitle("캘린더")
         .navigationBarTitleDisplayMode(.inline)
