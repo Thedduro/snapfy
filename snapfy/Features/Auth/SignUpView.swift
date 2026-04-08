@@ -11,6 +11,8 @@ struct SignUpView: View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
+                    ProfileAvatarView(imageData: nil, size: 88)
+
                     Text("시작하기")
                         .font(.largeTitle.bold())
 

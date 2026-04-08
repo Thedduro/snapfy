@@ -47,7 +47,8 @@ final class SessionStore: ObservableObject, AuthManaging {
 
         currentUser = AuthenticatedUser(
             id: user.id,
-            displayName: user.displayName
+            displayName: user.displayName,
+            profileImageData: user.profileImageData
         )
     }
 
@@ -73,7 +74,8 @@ final class SessionStore: ObservableObject, AuthManaging {
         UserDefaults.standard.set(user.id.uuidString, forKey: currentUserDefaultsKey)
         currentUser = AuthenticatedUser(
             id: user.id,
-            displayName: user.displayName
+            displayName: user.displayName,
+            profileImageData: user.profileImageData
         )
     }
 

@@ -5,7 +5,7 @@ import SwiftData
 final class UserAccount {
     @Attribute(.unique) var id: UUID
     var displayName: String
-    var authProvider: String
+    var authProvider: String?
     var externalAuthID: String?
     var profileImageData: Data?
     var createdAt: Date
@@ -13,7 +13,7 @@ final class UserAccount {
     init(
         id: UUID = UUID(),
         displayName: String,
-        authProvider: String = "local_device",
+        authProvider: String? = "local_device",
         externalAuthID: String? = nil,
         profileImageData: Data? = nil,
         createdAt: Date = .now
@@ -30,6 +30,7 @@ final class UserAccount {
 struct AuthenticatedUser: Equatable {
     let id: UUID
     let displayName: String
+    let profileImageData: Data?
 }
 
 struct SignUpPayload {

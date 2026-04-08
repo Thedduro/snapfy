@@ -9,11 +9,18 @@ struct SettingsPageView: View {
                 .font(.largeTitle.bold())
 
             if let currentUser = sessionStore.currentUser {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(currentUser.displayName)
-                        .font(.title3.bold())
-                    Text("로컬 온보딩 계정")
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    ProfileAvatarView(
+                        imageData: currentUser.profileImageData,
+                        size: 72
+                    )
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(currentUser.displayName)
+                            .font(.title3.bold())
+                        Text("로컬 온보딩 계정")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
