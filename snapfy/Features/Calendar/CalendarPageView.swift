@@ -10,7 +10,6 @@ struct CalendarPageView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 monthHeader
-                selectedDateSummary
 
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(CalendarDateUtils.weekdaySymbols(), id: \.self) { symbol in
@@ -54,13 +53,8 @@ struct CalendarPageView: View {
 
             Spacer()
 
-            VStack(spacing: 4) {
-                Text(CalendarDateUtils.monthTitle(for: displayedMonth))
-                    .font(.title3.bold())
-                Text("사진과 비디오가 쌓일 메인 캘린더")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(CalendarDateUtils.monthTitle(for: displayedMonth))
+                .font(.title3.bold())
 
             Spacer()
 
@@ -71,25 +65,6 @@ struct CalendarPageView: View {
                     .frame(width: 36, height: 36)
             }
         }
-    }
-
-    private var selectedDateSummary: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("선택한 날짜")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text(selectedDate.formatted(.dateTime.year().month(.wide).day()))
-                .font(.headline)
-
-            Text("이 날짜에 업로드된 사진과 비디오를 여기에 연결할 예정입니다.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
     private func shiftMonth(by value: Int) {
@@ -105,29 +80,20 @@ private struct CalendarDayCell: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(CalendarDateUtils.dayNumber(for: day))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
-
+            ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.blue.opacity(0.14) : Color(.secondarySystemBackground))
-                    .frame(height: 72)
-                    .overlay {
-                        VStack(spacing: 6) {
-                            Image(systemName: "photo")
-                                .font(.headline)
-                            Text("비어 있음")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(.secondary)
-                    }
+                    .fill(isSelected ? Color.blue.opacity(0.12) : Color(.secondarySystemBackground))
                     .overlay {
                         RoundedRectangle(cornerRadius: 14)
                             .stroke(borderColor, lineWidth: isSelected || CalendarDateUtils.isToday(day) ? 2 : 0)
                     }
+
+                Text(CalendarDateUtils.dayNumber(for: day))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
+                    .padding(10)
             }
-            .frame(maxWidth: .infinity, minHeight: 102, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 88, maxHeight: 88, alignment: .topLeading)
         }
         .buttonStyle(.plain)
     }
