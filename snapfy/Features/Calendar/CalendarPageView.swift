@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CalendarPageView: View {
     @State private var displayedMonth = CalendarDateUtils.startOfMonth(for: .now)
+    @State private var selectedDate = Date()
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
 
@@ -9,6 +10,7 @@ struct CalendarPageView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 monthHeader
+                selectedDateSummary
 
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(CalendarDateUtils.weekdaySymbols(), id: \.self) { symbol in
@@ -21,7 +23,11 @@ struct CalendarPageView: View {
                     ForEach(CalendarDateUtils.monthDays(for: displayedMonth), id: \.self) { day in
                         CalendarDayCell(
                             day: day,
-                            isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth)
+                            isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth),
+                            isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
+                            onTap: {
+                                selectedDate = day
+                            }
                         )
                     }
                 }
@@ -30,6 +36,11 @@ struct CalendarPageView: View {
         }
         .navigationTitle("캘린더")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: displayedMonth) { _, newValue in
+            if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
+                selectedDate = newValue
+            }
+        }
     }
 
     private var monthHeader: some View {
@@ -62,6 +73,25 @@ struct CalendarPageView: View {
         }
     }
 
+    private var selectedDateSummary: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("선택한 날짜")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(selectedDate.formatted(.dateTime.year().month(.wide).day()))
+                .font(.headline)
+
+            Text("이 날짜에 업로드된 사진과 비디오를 여기에 연결할 예정입니다.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
     private func shiftMonth(by value: Int) {
         displayedMonth = CalendarDateUtils.calendar.date(byAdding: .month, value: value, to: displayedMonth) ?? displayedMonth
     }
@@ -70,33 +100,48 @@ struct CalendarPageView: View {
 private struct CalendarDayCell: View {
     let day: Date
     let isCurrentMonth: Bool
+    let isSelected: Bool
+    let onTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(CalendarDateUtils.dayNumber(for: day))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(CalendarDateUtils.dayNumber(for: day))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
 
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(.secondarySystemBackground))
-                .frame(height: 72)
-                .overlay {
-                    VStack(spacing: 6) {
-                        Image(systemName: "photo")
-                            .font(.headline)
-                        Text("비어 있음")
-                            .font(.caption2)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(isSelected ? Color.blue.opacity(0.14) : Color(.secondarySystemBackground))
+                    .frame(height: 72)
+                    .overlay {
+                        VStack(spacing: 6) {
+                            Image(systemName: "photo")
+                                .font(.headline)
+                            Text("비어 있음")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.secondary)
-                }
-                .overlay {
-                    if CalendarDateUtils.isToday(day) {
+                    .overlay {
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.accentColor, lineWidth: 2)
+                            .stroke(borderColor, lineWidth: isSelected || CalendarDateUtils.isToday(day) ? 2 : 0)
                     }
-                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 102, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, minHeight: 102, alignment: .topLeading)
+        .buttonStyle(.plain)
+    }
+
+    private var borderColor: Color {
+        if isSelected {
+            return .blue
+        }
+
+        if CalendarDateUtils.isToday(day) {
+            return .accentColor
+        }
+
+        return .clear
     }
 }
 

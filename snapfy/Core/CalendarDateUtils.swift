@@ -36,6 +36,10 @@ enum CalendarDateUtils {
         calendar.isDate(date, equalTo: month, toGranularity: .month)
     }
 
+    static func isSameDay(_ lhs: Date, _ rhs: Date) -> Bool {
+        calendar.isDate(lhs, inSameDayAs: rhs)
+    }
+
     static func isToday(_ date: Date) -> Bool {
         calendar.isDateInToday(date)
     }
