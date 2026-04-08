@@ -1,8 +1,35 @@
 import SwiftUI
+import SwiftData
+import UIKit
+import UniformTypeIdentifiers
+
+private enum MediaSource: Identifiable {
+    case camera
+    case library
+
+    var id: String {
+        switch self {
+        case .camera: return "camera"
+        case .library: return "library"
+        }
+    }
+
+    var pickerSourceType: UIImagePickerController.SourceType {
+        switch self {
+        case .camera: return .camera
+        case .library: return .photoLibrary
+        }
+    }
+}
 
 struct CalendarPageView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \MediaEntry.createdAt, order: .reverse) private var mediaEntries: [MediaEntry]
+
     @State private var displayedMonth = CalendarDateUtils.startOfMonth(for: .now)
     @State private var selectedDate = Date()
+    @State private var showingMediaOptions = false
+    @State private var activeSource: MediaSource?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
 
@@ -24,8 +51,11 @@ struct CalendarPageView: View {
                             day: day,
                             isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth),
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
+                            thumbnailData: representativeMedia(for: day)?.thumbnailData,
+                            isVideo: representativeMedia(for: day)?.mediaType == "video",
                             onTap: {
                                 selectedDate = day
+                                showingMediaOptions = true
                             }
                         )
                     }
@@ -38,6 +68,26 @@ struct CalendarPageView: View {
         .onChange(of: displayedMonth) { _, newValue in
             if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
                 selectedDate = newValue
+            }
+        }
+        .confirmationDialog("추가 방식 선택", isPresented: $showingMediaOptions, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("카메라") {
+                    activeSource = .camera
+                }
+            }
+
+            Button("갤러리") {
+                activeSource = .library
+            }
+
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text(selectedDate.formatted(.dateTime.month().day()))
+        }
+        .sheet(item: $activeSource) { source in
+            MediaPickerSheet(source: source) { result in
+                handleMediaResult(result, for: selectedDate)
             }
         }
     }
@@ -70,12 +120,49 @@ struct CalendarPageView: View {
     private func shiftMonth(by value: Int) {
         displayedMonth = CalendarDateUtils.calendar.date(byAdding: .month, value: value, to: displayedMonth) ?? displayedMonth
     }
+
+    private func representativeMedia(for day: Date) -> MediaEntry? {
+        mediaEntries.first { CalendarDateUtils.isSameDay($0.date, day) }
+    }
+
+    private func handleMediaResult(_ result: MediaPickerResult, for date: Date) {
+        switch result {
+        case .image(let image):
+            saveImage(image, for: date)
+        case .video(let url):
+            saveVideo(url, for: date)
+        }
+    }
+
+    private func saveImage(_ image: UIImage, for date: Date) {
+        guard let imageData = MediaProcessingUtils.imageData(from: image),
+              let thumbnailData = MediaProcessingUtils.thumbnailData(from: image) else {
+            return
+        }
+
+        let entry = MediaEntry(date: date, imageData: imageData, thumbnailData: thumbnailData, mediaType: "image")
+        modelContext.insert(entry)
+        try? modelContext.save()
+    }
+
+    private func saveVideo(_ url: URL, for date: Date) {
+        guard let videoData = MediaProcessingUtils.videoData(from: url),
+              let thumbnailData = MediaProcessingUtils.videoThumbnailData(from: url) else {
+            return
+        }
+
+        let entry = MediaEntry(date: date, videoData: videoData, thumbnailData: thumbnailData, mediaType: "video")
+        modelContext.insert(entry)
+        try? modelContext.save()
+    }
 }
 
 private struct CalendarDayCell: View {
     let day: Date
     let isCurrentMonth: Bool
     let isSelected: Bool
+    let thumbnailData: Data?
+    let isVideo: Bool
     let onTap: () -> Void
 
     var body: some View {
@@ -87,6 +174,25 @@ private struct CalendarDayCell: View {
                         RoundedRectangle(cornerRadius: 14)
                             .stroke(borderColor, lineWidth: isSelected || CalendarDateUtils.isToday(day) ? 2 : 0)
                     }
+
+                if let thumbnailData,
+                   let image = UIImage(data: thumbnailData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(alignment: .bottomTrailing) {
+                            if isVideo {
+                                Image(systemName: "video.fill")
+                                    .font(.caption2)
+                                    .padding(6)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(Circle())
+                                    .padding(6)
+                            }
+                        }
+                }
 
                 Text(CalendarDateUtils.dayNumber(for: day))
                     .font(.caption.weight(.semibold))
@@ -111,8 +217,64 @@ private struct CalendarDayCell: View {
     }
 }
 
+private enum MediaPickerResult {
+    case image(UIImage)
+    case video(URL)
+}
+
+private struct MediaPickerSheet: UIViewControllerRepresentable {
+    let source: MediaSource
+    let onPick: (MediaPickerResult) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick, dismiss: dismiss)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = source.pickerSourceType
+        picker.mediaTypes = [UTType.image.identifier, UTType.movie.identifier]
+        picker.videoMaximumDuration = 60
+        picker.videoQuality = .typeMedium
+        picker.allowsEditing = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let onPick: (MediaPickerResult) -> Void
+        let dismiss: DismissAction
+
+        init(onPick: @escaping (MediaPickerResult) -> Void, dismiss: DismissAction) {
+            self.onPick = onPick
+            self.dismiss = dismiss
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = info[.originalImage] as? UIImage {
+                onPick(.image(image))
+            } else if let videoURL = info[.mediaURL] as? URL {
+                onPick(.video(videoURL))
+            }
+            dismiss()
+        }
+    }
+}
+
 #Preview {
     NavigationStack {
         CalendarPageView()
+            .modelContainer(for: [MediaEntry.self], inMemory: true)
     }
 }
