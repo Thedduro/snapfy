@@ -3,11 +3,13 @@ import SwiftData
 
 enum PersistenceController {
     static let shared: ModelContainer = {
-        let schema = Schema([MediaEntry.self])
+        let schema = Schema([MediaEntry.self, UserAccount.self])
         let storeURL = applicationSupportDirectory.appendingPathComponent("MediaCalendar.store")
 
         #if DEBUG
-        resetStoreIfNeeded(at: storeURL)
+        if ProcessInfo.processInfo.arguments.contains("-reset-store") {
+            resetStoreIfNeeded(at: storeURL)
+        }
         #endif
 
         let configuration = ModelConfiguration(schema: schema, url: storeURL)
