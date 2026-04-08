@@ -1,24 +1,23 @@
 import SwiftUI
 
 enum AppTab: Hashable {
-    case home
-    case calendar
     case library
+    case calendar
     case settings
 }
 
 struct ContentView: View {
-    @State private var selectedTab: AppTab = .home
+    @State private var selectedTab: AppTab = .calendar
 
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                HomeView(selectedTab: $selectedTab)
+                LibraryPageView()
             }
             .tabItem {
-                Label("홈", systemImage: "house")
+                Label("갤러리", systemImage: "photo.stack")
             }
-            .tag(AppTab.home)
+            .tag(AppTab.library)
 
             NavigationStack {
                 CalendarPageView()
@@ -27,14 +26,6 @@ struct ContentView: View {
                 Label("캘린더", systemImage: "calendar")
             }
             .tag(AppTab.calendar)
-
-            NavigationStack {
-                LibraryPageView()
-            }
-            .tabItem {
-                Label("최근", systemImage: "photo.stack")
-            }
-            .tag(AppTab.library)
 
             NavigationStack {
                 SettingsPageView()
