@@ -23,3 +23,7 @@ DerivedData/
 
 # Logs
 *.log
+# Environment files
+.env
+.env.*
+!.env.example
