@@ -1,5 +1,6 @@
-import SwiftUI
+import AVKit
 import SwiftData
+import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
@@ -22,6 +23,14 @@ private enum MediaSource: Identifiable {
     }
 }
 
+private struct SelectedDay: Identifiable {
+    let date: Date
+
+    var id: String {
+        ISO8601DateFormatter().string(from: date)
+    }
+}
+
 struct CalendarPageView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \MediaEntry.createdAt, order: .reverse) private var mediaEntries: [MediaEntry]
@@ -30,6 +39,7 @@ struct CalendarPageView: View {
     @State private var selectedDate = Date()
     @State private var showingMediaOptions = false
     @State private var activeSource: MediaSource?
+    @State private var presentedMediaDay: SelectedDay?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -47,19 +57,28 @@ struct CalendarPageView: View {
                     }
 
                     ForEach(CalendarDateUtils.monthDays(for: displayedMonth), id: \.self) { day in
+                        let dayEntries = entries(for: day)
+
                         CalendarDayCell(
                             day: day,
                             isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth),
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
-                            thumbnailData: representativeMedia(for: day)?.thumbnailData,
-                            isVideo: representativeMedia(for: day)?.mediaType == "video",
+                            thumbnailData: dayEntries.first?.thumbnailData,
+                            isVideo: dayEntries.first?.mediaType == "video",
                             isShowingOptions: showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate),
                             onTap: {
-                                if CalendarDateUtils.isSameDay(day, selectedDate), showingMediaOptions {
-                                    showingMediaOptions = false
+                                let wasSelectedDay = CalendarDateUtils.isSameDay(day, selectedDate)
+                                selectedDate = day
+
+                                if dayEntries.isEmpty {
+                                    if wasSelectedDay, showingMediaOptions {
+                                        showingMediaOptions = false
+                                    } else {
+                                        showingMediaOptions = true
+                                    }
                                 } else {
-                                    selectedDate = day
-                                    showingMediaOptions = true
+                                    showingMediaOptions = false
+                                    presentedMediaDay = SelectedDay(date: day)
                                 }
                             },
                             onSelectCamera: {
@@ -96,6 +115,15 @@ struct CalendarPageView: View {
             MediaPickerSheet(source: source) { result in
                 handleMediaResult(result, for: selectedDate)
             }
+        }
+        .sheet(item: $presentedMediaDay) { selectedDay in
+            DayMediaViewerSheet(
+                date: selectedDay.date,
+                entries: entries(for: selectedDay.date),
+                onPick: { result in
+                    handleMediaResult(result, for: selectedDay.date)
+                }
+            )
         }
     }
 
@@ -134,8 +162,8 @@ struct CalendarPageView: View {
         activeSource = source
     }
 
-    private func representativeMedia(for day: Date) -> MediaEntry? {
-        mediaEntries.first { CalendarDateUtils.isSameDay($0.date, day) }
+    private func entries(for day: Date) -> [MediaEntry] {
+        mediaEntries.filter { CalendarDateUtils.isSameDay($0.date, day) }
     }
 
     private func handleMediaResult(_ result: MediaPickerResult, for date: Date) {
@@ -301,6 +329,151 @@ private struct CalendarDayActionBubble: View {
                 .offset(y: 12)
         }
         .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+    }
+}
+
+private struct DayMediaViewerSheet: View {
+    let date: Date
+    let entries: [MediaEntry]
+    let onPick: (MediaPickerResult) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var activeSource: MediaSource?
+    @State private var selectedIndex = 0
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 18) {
+                if entries.isEmpty {
+                    ContentUnavailableView("미디어가 없습니다", systemImage: "photo.on.rectangle")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    TabView(selection: $selectedIndex) {
+                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                            DayMediaPage(entry: entry)
+                                .tag(index)
+                                .padding(.horizontal, 12)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .frame(maxWidth: .infinity, maxHeight: 440)
+
+                    HStack {
+                        Text("\(selectedIndex + 1) / \(entries.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Text(date.formatted(.dateTime.year().month().day()))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 20)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 18)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("닫기") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text(date.formatted(.dateTime.month().day()))
+                        .font(.headline)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button("카메라", systemImage: "camera") {
+                                activeSource = .camera
+                            }
+                        }
+
+                        Button("갤러리", systemImage: "photo.on.rectangle") {
+                            activeSource = .library
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .sheet(item: $activeSource, onDismiss: {
+            activeSource = nil
+        }) { source in
+            MediaPickerSheet(source: source) { result in
+                onPick(result)
+            }
+        }
+        .onChange(of: entries.count) { _, newCount in
+            if newCount == 0 {
+                selectedIndex = 0
+            } else if selectedIndex >= newCount {
+                selectedIndex = max(0, newCount - 1)
+            } else {
+                selectedIndex = 0
+            }
+        }
+    }
+}
+
+private struct DayMediaPage: View {
+    let entry: MediaEntry
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(.secondarySystemBackground))
+
+            if entry.mediaType == "video", let data = entry.videoData {
+                DayMediaVideoPlayer(entryID: entry.id, videoData: data)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+            } else if let data = entry.imageData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct DayMediaVideoPlayer: View {
+    let entryID: UUID
+    let videoData: Data
+
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        Group {
+            if let player {
+                VideoPlayer(player: player)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task(id: entryID) {
+            guard let url = MediaProcessingUtils.temporaryVideoURL(from: videoData, id: entryID) else {
+                player = nil
+                return
+            }
+            player = AVPlayer(url: url)
+        }
+        .onDisappear {
+            player?.pause()
+        }
     }
 }
 

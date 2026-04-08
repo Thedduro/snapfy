@@ -36,4 +36,20 @@ enum MediaProcessingUtils {
 
         return UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.8)
     }
+
+    static func temporaryVideoURL(from data: Data, id: UUID) -> URL? {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("snapfy-\(id.uuidString)")
+            .appendingPathExtension("mov")
+
+        do {
+            if FileManager.default.fileExists(atPath: url.path()) {
+                try FileManager.default.removeItem(at: url)
+            }
+            try data.write(to: url, options: .atomic)
+            return url
+        } catch {
+            return nil
+        }
+    }
 }
