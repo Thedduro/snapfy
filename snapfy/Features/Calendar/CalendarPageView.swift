@@ -53,9 +53,25 @@ struct CalendarPageView: View {
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
                             thumbnailData: representativeMedia(for: day)?.thumbnailData,
                             isVideo: representativeMedia(for: day)?.mediaType == "video",
+                            isShowingOptions: Binding(
+                                get: {
+                                    showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate)
+                                },
+                                set: { isShowing in
+                                    showingMediaOptions = isShowing
+                                }
+                            ),
                             onTap: {
                                 selectedDate = day
                                 showingMediaOptions = true
+                            },
+                            onSelectCamera: {
+                                selectedDate = day
+                                openMediaSource(.camera)
+                            },
+                            onSelectLibrary: {
+                                selectedDate = day
+                                openMediaSource(.library)
                             }
                         )
                     }
@@ -70,23 +86,6 @@ struct CalendarPageView: View {
             if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
                 selectedDate = newValue
             }
-        }
-        .confirmationDialog("추가 방식 선택", isPresented: $showingMediaOptions, titleVisibility: .visible) {
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button("카메라") {
-                    activeSource = nil
-                    activeSource = .camera
-                }
-            }
-
-            Button("갤러리") {
-                activeSource = nil
-                activeSource = .library
-            }
-
-            Button("취소", role: .cancel) {}
-        } message: {
-            Text(selectedDate.formatted(.dateTime.month().day()))
         }
         .sheet(item: $activeSource, onDismiss: {
             activeSource = nil
@@ -124,6 +123,12 @@ struct CalendarPageView: View {
 
     private func shiftMonth(by value: Int) {
         displayedMonth = CalendarDateUtils.calendar.date(byAdding: .month, value: value, to: displayedMonth) ?? displayedMonth
+    }
+
+    private func openMediaSource(_ source: MediaSource) {
+        showingMediaOptions = false
+        activeSource = nil
+        activeSource = source
     }
 
     private func representativeMedia(for day: Date) -> MediaEntry? {
@@ -168,7 +173,10 @@ private struct CalendarDayCell: View {
     let isSelected: Bool
     let thumbnailData: Data?
     let isVideo: Bool
+    @Binding var isShowingOptions: Bool
     let onTap: () -> Void
+    let onSelectCamera: () -> Void
+    let onSelectLibrary: () -> Void
 
     private let cornerRadius: CGFloat = 14
     private let cellHeight: CGFloat = 88
@@ -217,6 +225,15 @@ private struct CalendarDayCell: View {
             .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         }
         .buttonStyle(.plain)
+        .popover(isPresented: $isShowingOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+            CalendarDayActionPopover(
+                date: day,
+                showsCamera: UIImagePickerController.isSourceTypeAvailable(.camera),
+                onSelectCamera: onSelectCamera,
+                onSelectLibrary: onSelectLibrary
+            )
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     private var dayNumberColor: Color {
@@ -241,6 +258,37 @@ private struct CalendarDayCell: View {
         }
 
         return .clear
+    }
+}
+
+private struct CalendarDayActionPopover: View {
+    let date: Date
+    let showsCamera: Bool
+    let onSelectCamera: () -> Void
+    let onSelectLibrary: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(date.formatted(.dateTime.month().day()))
+                .font(.subheadline.weight(.semibold))
+
+            if showsCamera {
+                Button(action: onSelectCamera) {
+                    Label("카메라", systemImage: "camera")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            }
+
+            Button(action: onSelectLibrary) {
+                Label("갤러리", systemImage: "photo.on.rectangle")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(14)
+        .frame(width: 180)
     }
 }
 
