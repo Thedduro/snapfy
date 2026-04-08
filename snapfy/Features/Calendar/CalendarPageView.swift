@@ -185,6 +185,7 @@ private struct CalendarDayCell: View {
                         .resizable()
                         .scaledToFill()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(alignment: .bottomTrailing) {
                             if isVideo {
@@ -204,6 +205,8 @@ private struct CalendarDayCell: View {
                     .padding(10)
             }
             .frame(maxWidth: .infinity, minHeight: 88, maxHeight: 88, alignment: .topLeading)
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
     }
