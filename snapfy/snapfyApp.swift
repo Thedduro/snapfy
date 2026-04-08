@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct snapfyApp: App {
@@ -6,5 +7,6 @@ struct snapfyApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(PersistenceController.shared)
     }
 }
