@@ -73,11 +73,13 @@ struct CalendarPageView: View {
         .confirmationDialog("추가 방식 선택", isPresented: $showingMediaOptions, titleVisibility: .visible) {
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("카메라") {
+                    activeSource = nil
                     activeSource = .camera
                 }
             }
 
             Button("갤러리") {
+                activeSource = nil
                 activeSource = .library
             }
 
@@ -85,7 +87,9 @@ struct CalendarPageView: View {
         } message: {
             Text(selectedDate.formatted(.dateTime.month().day()))
         }
-        .sheet(item: $activeSource) { source in
+        .sheet(item: $activeSource, onDismiss: {
+            activeSource = nil
+        }) { source in
             MediaPickerSheet(source: source) { result in
                 handleMediaResult(result, for: selectedDate)
             }
