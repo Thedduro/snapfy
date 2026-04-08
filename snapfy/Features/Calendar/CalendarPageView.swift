@@ -53,17 +53,14 @@ struct CalendarPageView: View {
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
                             thumbnailData: representativeMedia(for: day)?.thumbnailData,
                             isVideo: representativeMedia(for: day)?.mediaType == "video",
-                            isShowingOptions: Binding(
-                                get: {
-                                    showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate)
-                                },
-                                set: { isShowing in
-                                    showingMediaOptions = isShowing
-                                }
-                            ),
+                            isShowingOptions: showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate),
                             onTap: {
-                                selectedDate = day
-                                showingMediaOptions = true
+                                if CalendarDateUtils.isSameDay(day, selectedDate), showingMediaOptions {
+                                    showingMediaOptions = false
+                                } else {
+                                    selectedDate = day
+                                    showingMediaOptions = true
+                                }
                             },
                             onSelectCamera: {
                                 selectedDate = day
@@ -85,6 +82,7 @@ struct CalendarPageView: View {
         .onChange(of: displayedMonth) { _, newValue in
             if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
                 selectedDate = newValue
+                showingMediaOptions = false
             }
         }
         .sheet(item: $activeSource, onDismiss: {
@@ -173,7 +171,7 @@ private struct CalendarDayCell: View {
     let isSelected: Bool
     let thumbnailData: Data?
     let isVideo: Bool
-    @Binding var isShowingOptions: Bool
+    let isShowingOptions: Bool
     let onTap: () -> Void
     let onSelectCamera: () -> Void
     let onSelectLibrary: () -> Void
@@ -196,18 +194,8 @@ private struct CalendarDayCell: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: cellSize.width, height: cellSize.height)
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                             .clipped()
-                            .overlay(alignment: .bottomTrailing) {
-                                if isVideo {
-                                    Image(systemName: "video.fill")
-                                        .font(.caption2)
-                                        .padding(6)
-                                        .background(.ultraThinMaterial)
-                                        .clipShape(Circle())
-                                        .padding(6)
-                                }
-                            }
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                     }
 
                     RoundedRectangle(cornerRadius: cornerRadius)
@@ -217,6 +205,16 @@ private struct CalendarDayCell: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(dayNumberColor)
                         .padding(10)
+
+                    if isVideo {
+                        Image(systemName: "video.fill")
+                            .font(.caption2)
+                            .padding(6)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .padding(6)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    }
                 }
                 .frame(width: cellSize.width, height: cellSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
@@ -225,15 +223,20 @@ private struct CalendarDayCell: View {
             .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $isShowingOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-            CalendarDayActionPopover(
-                date: day,
-                showsCamera: UIImagePickerController.isSourceTypeAvailable(.camera),
-                onSelectCamera: onSelectCamera,
-                onSelectLibrary: onSelectLibrary
-            )
-            .presentationCompactAdaptation(.popover)
+        .overlay(alignment: .top) {
+            if isShowingOptions {
+                CalendarDayActionBubble(
+                    date: day,
+                    showsCamera: UIImagePickerController.isSourceTypeAvailable(.camera),
+                    onSelectCamera: onSelectCamera,
+                    onSelectLibrary: onSelectLibrary
+                )
+                .offset(y: -cellHeight - 10)
+                .transition(.scale(scale: 0.95).combined(with: .opacity))
+                .zIndex(10)
+            }
         }
+        .zIndex(isShowingOptions ? 10 : 0)
     }
 
     private var dayNumberColor: Color {
@@ -261,14 +264,14 @@ private struct CalendarDayCell: View {
     }
 }
 
-private struct CalendarDayActionPopover: View {
+private struct CalendarDayActionBubble: View {
     let date: Date
     let showsCamera: Bool
     let onSelectCamera: () -> Void
     let onSelectLibrary: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(date.formatted(.dateTime.month().day()))
                 .font(.subheadline.weight(.semibold))
 
@@ -287,8 +290,16 @@ private struct CalendarDayActionPopover: View {
             }
             .buttonStyle(.bordered)
         }
-        .padding(14)
-        .frame(width: 180)
+        .padding(12)
+        .frame(width: 170)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(alignment: .bottom) {
+            Image(systemName: "arrowtriangle.down.fill")
+                .font(.caption)
+                .foregroundStyle(.thinMaterial)
+                .offset(y: 12)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
     }
 }
 
