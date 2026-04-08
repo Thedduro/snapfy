@@ -248,7 +248,7 @@ private struct CalendarDayCell: View {
             return .red
         }
 
-        return isCurrentMonth ? .primary : .tertiary
+        return isCurrentMonth ? .primary : Color.secondary.opacity(0.45)
     }
 
     private var borderColor: Color {
