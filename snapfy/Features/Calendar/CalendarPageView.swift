@@ -170,44 +170,51 @@ private struct CalendarDayCell: View {
     let isVideo: Bool
     let onTap: () -> Void
 
+    private let cornerRadius: CGFloat = 14
+    private let cellHeight: CGFloat = 88
+
     var body: some View {
         Button(action: onTap) {
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.blue.opacity(0.12) : Color(.secondarySystemBackground))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(borderColor, lineWidth: isSelected || CalendarDateUtils.isToday(day) ? 2 : 0)
+            GeometryReader { proxy in
+                let cellSize = proxy.size
+
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(isSelected ? Color.blue.opacity(0.12) : Color(.secondarySystemBackground))
+
+                    if let thumbnailData,
+                       let image = UIImage(data: thumbnailData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: cellSize.width, height: cellSize.height)
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                            .clipped()
+                            .overlay(alignment: .bottomTrailing) {
+                                if isVideo {
+                                    Image(systemName: "video.fill")
+                                        .font(.caption2)
+                                        .padding(6)
+                                        .background(.ultraThinMaterial)
+                                        .clipShape(Circle())
+                                        .padding(6)
+                                }
+                            }
                     }
 
-                if let thumbnailData,
-                   let image = UIImage(data: thumbnailData) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(alignment: .bottomTrailing) {
-                            if isVideo {
-                                Image(systemName: "video.fill")
-                                    .font(.caption2)
-                                    .padding(6)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Circle())
-                                    .padding(6)
-                            }
-                        }
-                }
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(borderColor, lineWidth: isSelected || CalendarDateUtils.isToday(day) ? 2 : 0)
 
-                Text(CalendarDateUtils.dayNumber(for: day))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
-                    .padding(10)
+                    Text(CalendarDateUtils.dayNumber(for: day))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(isCurrentMonth ? .primary : .tertiary)
+                        .padding(10)
+                }
+                .frame(width: cellSize.width, height: cellSize.height)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
             }
-            .frame(maxWidth: .infinity, minHeight: 88, maxHeight: 88, alignment: .topLeading)
-            .contentShape(RoundedRectangle(cornerRadius: 14))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         }
         .buttonStyle(.plain)
     }
