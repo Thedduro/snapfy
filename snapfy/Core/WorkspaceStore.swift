@@ -1,4 +1,5 @@
 import Combine
+import FirebaseAuth
 import FirebaseFirestore
 import Foundation
 
@@ -11,7 +12,7 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
     private let currentWorkspaceDefaultsKey = "workspace.currentWorkspaceID"
     private let inviteScheme = "snapfy"
     private let maxOwnedWorkspaceCount = 5
-    private var currentUserID: UUID?
+    private var currentUserID: String?
 
     init(firestore: Firestore? = nil) {
         self.firestore = firestore ?? FirebaseBootstrap.firestore
@@ -26,7 +27,7 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
             return
         }
 
-        currentUserID = user.id
+        currentUserID = Auth.auth().currentUser?.uid
 
         do {
             try await loadWorkspaces(for: user.id)
@@ -42,50 +43,55 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
             throw WorkspaceError.invalidName
         }
 
-        let ownerID = ownerUserID.uuidString
-        let ownedSnapshot = try await firestore
-            .collection("workspaces")
-            .whereField("ownerUserID", isEqualTo: ownerID)
-            .getDocuments()
+        let ownerID = try requireFirebaseUserID()
 
-        guard ownedSnapshot.documents.count < maxOwnedWorkspaceCount else {
-            throw WorkspaceError.workspaceLimitReached
+        do {
+            let ownedSnapshot = try await firestore
+                .collection("workspaces")
+                .whereField("ownerUserID", isEqualTo: ownerID)
+                .getDocuments()
+
+            guard ownedSnapshot.documents.count < maxOwnedWorkspaceCount else {
+                throw WorkspaceError.workspaceLimitReached
+            }
+
+            let workspaceID = UUID()
+            let inviteToken = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            let now = Date()
+
+            let workspacePayload: [String: Any] = [
+                "name": trimmedName,
+                "ownerUserID": ownerID,
+                "inviteToken": inviteToken,
+                "createdAt": Timestamp(date: now)
+            ]
+            let memberPayload: [String: Any] = [
+                "userID": ownerID,
+                "role": "owner",
+                "joinedAt": Timestamp(date: now)
+            ]
+            let invitePayload: [String: Any] = [
+                "workspaceID": workspaceID.uuidString,
+                "createdBy": ownerID,
+                "createdAt": Timestamp(date: now)
+            ]
+
+            try await firestore.collection("workspaces").document(workspaceID.uuidString).setData(workspacePayload)
+            try await firestore.collection("workspaces").document(workspaceID.uuidString).collection("members").document(ownerID).setData(memberPayload)
+            try await firestore.collection("invites").document(inviteToken).setData(invitePayload)
+
+            try await loadWorkspaces(for: ownerUserID)
+
+            let summary = WorkspaceSummary(
+                id: workspaceID,
+                name: trimmedName,
+                ownerUserID: ownerID,
+                inviteToken: inviteToken
+            )
+            persistCurrentWorkspace(summary)
+        } catch {
+            throw mapFirestoreError(error)
         }
-
-        let workspaceID = UUID()
-        let inviteToken = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        let now = Date()
-
-        let workspacePayload: [String: Any] = [
-            "name": trimmedName,
-            "ownerUserID": ownerID,
-            "inviteToken": inviteToken,
-            "createdAt": Timestamp(date: now)
-        ]
-        let memberPayload: [String: Any] = [
-            "userID": ownerID,
-            "role": "owner",
-            "joinedAt": Timestamp(date: now)
-        ]
-        let invitePayload: [String: Any] = [
-            "workspaceID": workspaceID.uuidString,
-            "createdBy": ownerID,
-            "createdAt": Timestamp(date: now)
-        ]
-
-        try await firestore.collection("workspaces").document(workspaceID.uuidString).setData(workspacePayload)
-        try await firestore.collection("workspaces").document(workspaceID.uuidString).collection("members").document(ownerID).setData(memberPayload)
-        try await firestore.collection("invites").document(inviteToken).setData(invitePayload)
-
-        try await loadWorkspaces(for: ownerUserID)
-
-        let summary = WorkspaceSummary(
-            id: workspaceID,
-            name: trimmedName,
-            ownerUserID: ownerUserID,
-            inviteToken: inviteToken
-        )
-        persistCurrentWorkspace(summary)
     }
 
     func inviteLink() async throws -> String {
@@ -100,7 +106,7 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
             try await workspaceDocument.updateData(["inviteToken": token])
             try await firestore.collection("invites").document(token).setData([
                 "workspaceID": currentWorkspace.id.uuidString,
-                "createdBy": currentWorkspace.ownerUserID.uuidString,
+                "createdBy": currentWorkspace.ownerUserID,
                 "createdAt": Timestamp(date: .now)
             ])
 
@@ -162,32 +168,36 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
     }
 
     private func joinWorkspace(withInviteToken token: String, userID: UUID) async throws {
-        let inviteDocument = try await firestore.collection("invites").document(token).getDocument()
+        do {
+            let inviteDocument = try await firestore.collection("invites").document(token).getDocument()
 
-        guard let inviteData = inviteDocument.data(),
-              let workspaceIDRaw = inviteData["workspaceID"] as? String,
-              let workspaceID = UUID(uuidString: workspaceIDRaw) else {
-            throw WorkspaceError.invalidInvite
-        }
+            guard let inviteData = inviteDocument.data(),
+                  let workspaceIDRaw = inviteData["workspaceID"] as? String,
+                  let workspaceID = UUID(uuidString: workspaceIDRaw) else {
+                throw WorkspaceError.invalidInvite
+            }
 
-        let userIDRaw = userID.uuidString
-        let memberPayload: [String: Any] = [
-            "userID": userIDRaw,
-            "role": "member",
-            "joinedAt": Timestamp(date: .now)
-        ]
+            let userIDRaw = try requireFirebaseUserID()
+            let memberPayload: [String: Any] = [
+                "userID": userIDRaw,
+                "role": "member",
+                "joinedAt": Timestamp(date: .now)
+            ]
 
-        try await firestore.collection("workspaces").document(workspaceIDRaw).collection("members").document(userIDRaw).setData(memberPayload, merge: true)
+            try await firestore.collection("workspaces").document(workspaceIDRaw).collection("members").document(userIDRaw).setData(memberPayload, merge: true)
 
-        try await loadWorkspaces(for: userID)
+            try await loadWorkspaces(for: userID)
 
-        if let joinedWorkspace = workspaces.first(where: { $0.id == workspaceID }) {
-            persistCurrentWorkspace(joinedWorkspace)
+            if let joinedWorkspace = workspaces.first(where: { $0.id == workspaceID }) {
+                persistCurrentWorkspace(joinedWorkspace)
+            }
+        } catch {
+            throw mapFirestoreError(error)
         }
     }
 
     private func loadWorkspaces(for userID: UUID) async throws {
-        let userIDRaw = userID.uuidString
+        let userIDRaw = try requireFirebaseUserID()
         let membershipSnapshot = try await firestore
             .collectionGroup("members")
             .whereField("userID", isEqualTo: userIDRaw)
@@ -207,7 +217,6 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
             guard let data = workspaceDoc.data(),
                   let name = data["name"] as? String,
                   let ownerRaw = data["ownerUserID"] as? String,
-                  let ownerUUID = UUID(uuidString: ownerRaw),
                   let workspaceUUID = UUID(uuidString: workspaceID) else {
                 continue
             }
@@ -216,7 +225,7 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
                 WorkspaceSummary(
                     id: workspaceUUID,
                     name: name,
-                    ownerUserID: ownerUUID,
+                    ownerUserID: ownerRaw,
                     inviteToken: data["inviteToken"] as? String
                 )
             )
@@ -262,6 +271,32 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
             workspaces.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
     }
+
+    private func requireFirebaseUserID() throws -> String {
+        guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+            throw WorkspaceError.authenticationRequired
+        }
+        return uid
+    }
+
+    private func mapFirestoreError(_ error: Error) -> WorkspaceError {
+        if let workspaceError = error as? WorkspaceError {
+            return workspaceError
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == FirestoreErrorDomain,
+           let code = FirestoreErrorCode.Code(rawValue: nsError.code) {
+            switch code {
+            case .permissionDenied:
+                return .permissionDenied
+            default:
+                break
+            }
+        }
+
+        return .unknown
+    }
 }
 
 enum WorkspaceError: LocalizedError {
@@ -269,6 +304,8 @@ enum WorkspaceError: LocalizedError {
     case invalidInvite
     case workspaceLimitReached
     case workspaceNotFound
+    case authenticationRequired
+    case permissionDenied
     case unknown
 
     var errorDescription: String? {
@@ -281,6 +318,10 @@ enum WorkspaceError: LocalizedError {
             return "워크스페이스는 최대 5개까지 만들 수 있습니다."
         case .workspaceNotFound:
             return "현재 워크스페이스를 찾을 수 없습니다."
+        case .authenticationRequired:
+            return "로그인이 필요합니다. 다시 로그인해주세요."
+        case .permissionDenied:
+            return "권한이 없어 워크스페이스를 처리할 수 없습니다. 로그인 상태 또는 Firestore 규칙을 확인해주세요."
         case .unknown:
             return "워크스페이스를 처리하지 못했습니다."
         }
