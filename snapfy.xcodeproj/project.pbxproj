@@ -394,6 +394,15 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = (
+					{
+						CFBundleTypeRole = Editor;
+						CFBundleURLName = thedduro.snapfy;
+						CFBundleURLSchemes = (
+							snapfy,
+						);
+					},
+				);
 				INFOPLIST_KEY_NSCameraUsageDescription = "캘린더 날짜에 사진과 동영상을 추가하기 위해 카메라 접근이 필요합니다.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "캘린더 날짜에 동영상을 녹화할 때 오디오를 함께 저장하기 위해 마이크 접근이 필요합니다.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "캘린더 날짜에 사진과 동영상을 추가하기 위해 갤러리 접근이 필요합니다.";
@@ -439,6 +448,15 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = (
+					{
+						CFBundleTypeRole = Editor;
+						CFBundleURLName = thedduro.snapfy;
+						CFBundleURLSchemes = (
+							snapfy,
+						);
+					},
+				);
 				INFOPLIST_KEY_NSCameraUsageDescription = "캘린더 날짜에 사진과 동영상을 추가하기 위해 카메라 접근이 필요합니다.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "캘린더 날짜에 동영상을 녹화할 때 오디오를 함께 저장하기 위해 마이크 접근이 필요합니다.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "캘린더 날짜에 사진과 동영상을 추가하기 위해 갤러리 접근이 필요합니다.";

@@ -3,7 +3,7 @@ import SwiftData
 
 enum PersistenceController {
     static let shared: ModelContainer = {
-        let schema = Schema([MediaEntry.self, UserAccount.self])
+        let schema = Schema([MediaEntry.self, UserAccount.self, WorkspaceRecord.self, WorkspaceMemberRecord.self])
         let storeURL = applicationSupportDirectory.appendingPathComponent("MediaCalendar.store")
 
         #if DEBUG

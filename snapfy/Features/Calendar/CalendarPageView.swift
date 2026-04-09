@@ -33,6 +33,7 @@ private struct SelectedDay: Identifiable {
 
 struct CalendarPageView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var workspaceStore: WorkspaceStore
     @Query(sort: \MediaEntry.createdAt, order: .reverse) private var mediaEntries: [MediaEntry]
 
     @State private var displayedMonth = CalendarDateUtils.startOfMonth(for: .now)
@@ -40,6 +41,9 @@ struct CalendarPageView: View {
     @State private var showingMediaOptions = false
     @State private var activeSource: MediaSource?
     @State private var presentedMediaDay: SelectedDay?
+    @State private var shareItems: [Any] = []
+    @State private var isShowingShareSheet = false
+    @State private var shareErrorMessage: String?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -103,11 +107,23 @@ struct CalendarPageView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 16)
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    presentWorkspaceShareSheet()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
         .onChange(of: displayedMonth) { _, newValue in
             if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
                 selectedDate = newValue
                 showingMediaOptions = false
             }
+        }
+        .sheet(isPresented: $isShowingShareSheet) {
+            ShareSheet(items: shareItems)
         }
         .sheet(item: $activeSource, onDismiss: {
             activeSource = nil
@@ -124,6 +140,21 @@ struct CalendarPageView: View {
                     handleMediaResult(result, for: selectedDay.date)
                 }
             )
+        }
+        .alert(
+            "공유할 수 없습니다",
+            isPresented: Binding(
+                get: { shareErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        shareErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(shareErrorMessage ?? WorkspaceError.unknown.errorDescription ?? "")
         }
     }
 
@@ -162,8 +193,26 @@ struct CalendarPageView: View {
         activeSource = source
     }
 
+    private func presentWorkspaceShareSheet() {
+        do {
+            let inviteLink = try workspaceStore.inviteLink()
+            shareItems = [inviteLink]
+            isShowingShareSheet = true
+        } catch let error as WorkspaceError {
+            shareErrorMessage = error.errorDescription
+        } catch {
+            shareErrorMessage = WorkspaceError.unknown.errorDescription
+        }
+    }
+
     private func entries(for day: Date) -> [MediaEntry] {
-        mediaEntries.filter { CalendarDateUtils.isSameDay($0.date, day) }
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            return []
+        }
+
+        return mediaEntries.filter {
+            $0.workspaceID == workspaceID && CalendarDateUtils.isSameDay($0.date, day)
+        }
     }
 
     private func handleMediaResult(_ result: MediaPickerResult, for date: Date) {
@@ -176,23 +225,43 @@ struct CalendarPageView: View {
     }
 
     private func saveImage(_ image: UIImage, for date: Date) {
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            return
+        }
+
         guard let imageData = MediaProcessingUtils.imageData(from: image),
               let thumbnailData = MediaProcessingUtils.thumbnailData(from: image) else {
             return
         }
 
-        let entry = MediaEntry(date: date, imageData: imageData, thumbnailData: thumbnailData, mediaType: "image")
+        let entry = MediaEntry(
+            workspaceID: workspaceID,
+            date: date,
+            imageData: imageData,
+            thumbnailData: thumbnailData,
+            mediaType: "image"
+        )
         modelContext.insert(entry)
         try? modelContext.save()
     }
 
     private func saveVideo(_ url: URL, for date: Date) {
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            return
+        }
+
         guard let videoData = MediaProcessingUtils.videoData(from: url),
               let thumbnailData = MediaProcessingUtils.videoThumbnailData(from: url) else {
             return
         }
 
-        let entry = MediaEntry(date: date, videoData: videoData, thumbnailData: thumbnailData, mediaType: "video")
+        let entry = MediaEntry(
+            workspaceID: workspaceID,
+            date: date,
+            videoData: videoData,
+            thumbnailData: thumbnailData,
+            mediaType: "video"
+        )
         modelContext.insert(entry)
         try? modelContext.save()
     }
