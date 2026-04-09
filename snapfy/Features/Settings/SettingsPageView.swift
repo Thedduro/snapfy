@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsPageView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @EnvironmentObject private var workspaceStore: WorkspaceStore
     @State private var isPresentingProfileEdit = false
 
     var body: some View {
@@ -28,6 +29,18 @@ struct SettingsPageView: View {
                     isPresentingProfileEdit = true
                 }
                 .buttonStyle(.borderedProminent)
+
+                if let currentWorkspace = workspaceStore.currentWorkspace {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("현재 워크스페이스")
+                            .font(.subheadline.weight(.semibold))
+                        Text(currentWorkspace.name)
+                            .font(.title3.bold())
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+                }
 
                 Button("로그아웃") {
                     sessionStore.signOut()

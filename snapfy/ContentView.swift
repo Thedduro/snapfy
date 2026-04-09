@@ -8,6 +8,7 @@ enum AppTab: Hashable {
 
 struct ContentView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @EnvironmentObject private var workspaceStore: WorkspaceStore
     @State private var selectedTab: AppTab = .calendar
 
     var body: some View {
@@ -15,6 +16,10 @@ struct ContentView: View {
             if sessionStore.currentUser == nil {
                 NavigationStack {
                     SignUpView()
+                }
+            } else if workspaceStore.currentWorkspace == nil {
+                NavigationStack {
+                    WorkspaceSetupView()
                 }
             } else {
                 TabView(selection: $selectedTab) {
@@ -44,10 +49,14 @@ struct ContentView: View {
                 }
             }
         }
+        .task(id: sessionStore.currentUser?.id) {
+            workspaceStore.syncSession(user: sessionStore.currentUser)
+        }
     }
 }
 
 #Preview {
     ContentView()
         .environmentObject(SessionStore())
+        .environmentObject(WorkspaceStore())
 }
