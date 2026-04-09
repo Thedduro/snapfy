@@ -4,21 +4,24 @@ import SwiftData
 @Model
 final class UserAccount {
     @Attribute(.unique) var id: UUID
-    var displayName: String
-    var authProvider: String?
+    @Attribute(.unique) var email: String
+    var displayName: String?
+    var authProvider: String
     var externalAuthID: String?
     var profileImageData: Data?
     var createdAt: Date
 
     init(
         id: UUID = UUID(),
-        displayName: String,
-        authProvider: String? = "local_device",
+        email: String,
+        displayName: String? = nil,
+        authProvider: String = "local_email",
         externalAuthID: String? = nil,
         profileImageData: Data? = nil,
         createdAt: Date = .now
     ) {
         self.id = id
+        self.email = email
         self.displayName = displayName
         self.authProvider = authProvider
         self.externalAuthID = externalAuthID
@@ -29,23 +32,50 @@ final class UserAccount {
 
 struct AuthenticatedUser: Equatable {
     let id: UUID
-    let displayName: String
+    let email: String
+    let displayName: String?
     let profileImageData: Data?
+
+    var resolvedDisplayName: String {
+        let trimmedDisplayName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let trimmedDisplayName, !trimmedDisplayName.isEmpty {
+            return trimmedDisplayName
+        }
+
+        let emailPrefix = email.split(separator: "@").first.map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let emailPrefix, !emailPrefix.isEmpty {
+            return emailPrefix
+        }
+
+        return email
+    }
 }
 
 struct SignUpPayload {
+    let email: String
     let displayName: String
 }
 
+enum AuthLookupResult {
+    case existingUser
+    case newUser
+}
+
 enum AuthError: LocalizedError {
+    case invalidEmail
     case invalidDisplayName
     case userNotFound
     case unknown
 
     var errorDescription: String? {
         switch self {
+        case .invalidEmail:
+            return "올바른 이메일을 입력해주세요."
         case .invalidDisplayName:
-            return "닉네임은 2자 이상 입력해주세요."
+            return "표시 이름은 2자 이상 입력하거나 비워둘 수 있습니다."
         case .userNotFound:
             return "사용자 정보를 찾을 수 없습니다."
         case .unknown:

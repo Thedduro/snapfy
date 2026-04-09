@@ -6,6 +6,7 @@ struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var sessionStore: SessionStore
 
+    let currentUser: AuthenticatedUser
     @State private var displayName: String
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var profileImageData: Data?
@@ -13,7 +14,8 @@ struct ProfileEditView: View {
     @State private var isSaving = false
 
     init(currentUser: AuthenticatedUser) {
-        _displayName = State(initialValue: currentUser.displayName)
+        self.currentUser = currentUser
+        _displayName = State(initialValue: currentUser.displayName ?? "")
         _profileImageData = State(initialValue: currentUser.profileImageData)
     }
 
@@ -34,10 +36,18 @@ struct ProfileEditView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("닉네임")
+                    Text("이메일")
                         .font(.subheadline.weight(.semibold))
 
-                    TextField("닉네임", text: $displayName)
+                    Text(currentUser.email)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("표시 이름")
+                        .font(.subheadline.weight(.semibold))
+
+                    TextField("표시 이름(선택)", text: $displayName)
                         .padding(14)
                         .background(
                             Color(.secondarySystemBackground),
@@ -118,6 +128,7 @@ struct ProfileEditView: View {
     ProfileEditView(
         currentUser: AuthenticatedUser(
             id: UUID(),
+            email: "hello@example.com",
             displayName: "테스트 유저",
             profileImageData: nil
         )

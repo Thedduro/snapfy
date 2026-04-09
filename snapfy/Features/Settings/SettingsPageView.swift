@@ -14,8 +14,11 @@ struct SettingsPageView: View {
                     )
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(currentUser.displayName)
+                        Text(currentUser.resolvedDisplayName)
                             .font(.title3.bold())
+                        Text(currentUser.email)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
 
                     Spacer()
@@ -37,7 +40,7 @@ struct SettingsPageView: View {
                 Text("로그인된 사용자가 없습니다.")
             }
 
-            Text("Firebase 연동 시 이메일, 프로필 이미지, 멤버 관리를 확장합니다.")
+            Text("다음 단계에서 클라우드 인증과 원격 저장 구조를 연결할 예정입니다.")
                 .foregroundStyle(.secondary)
 
             Spacer()
