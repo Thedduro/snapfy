@@ -24,7 +24,7 @@ final class WorkspaceRecord {
     }
 }
 
-struct WorkspaceSummary: Equatable {
+struct WorkspaceSummary: Hashable {
     let id: UUID
     let name: String
     let ownerUserID: UUID
