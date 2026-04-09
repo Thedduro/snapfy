@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4EF51D202F8774C2005D9F32 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4EF51D1F2F8774C2005D9F32 /* FirebaseCore */; };
+		4EF51D222F8774CC005D9F32 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4EF51D212F8774CC005D9F32 /* FirebaseFirestore */; };
+		4EF51D242F8774D1005D9F32 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4EF51D232F8774D1005D9F32 /* FirebaseAuth */; };
+		4EF51D262F8774DA005D9F32 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4EF51D252F8774DA005D9F32 /* FirebaseFunctions */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4EF51A832F854E59005D9F32 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +59,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4EF51D202F8774C2005D9F32 /* FirebaseCore in Frameworks */,
+				4EF51D242F8774D1005D9F32 /* FirebaseAuth in Frameworks */,
+				4EF51D222F8774CC005D9F32 /* FirebaseFirestore in Frameworks */,
+				4EF51D262F8774DA005D9F32 /* FirebaseFunctions in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +89,7 @@
 				4EF51A752F854E57005D9F32 /* snapfy */,
 				4EF51A852F854E59005D9F32 /* snapfyTests */,
 				4EF51A8F2F854E59005D9F32 /* snapfyUITests */,
+				4EF51D1E2F8774C2005D9F32 /* Frameworks */,
 				4EF51A742F854E57005D9F32 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +102,13 @@
 				4EF51A8C2F854E59005D9F32 /* snapfyUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4EF51D1E2F8774C2005D9F32 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +131,10 @@
 			);
 			name = snapfy;
 			packageProductDependencies = (
+				4EF51D1F2F8774C2005D9F32 /* FirebaseCore */,
+				4EF51D212F8774CC005D9F32 /* FirebaseFirestore */,
+				4EF51D232F8774D1005D9F32 /* FirebaseAuth */,
+				4EF51D252F8774DA005D9F32 /* FirebaseFunctions */,
 			);
 			productName = snapfy;
 			productReference = 4EF51A732F854E57005D9F32 /* snapfy.app */;
@@ -195,6 +218,9 @@
 			);
 			mainGroup = 4EF51A6A2F854E57005D9F32;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4EF51D1D2F8773E2005D9F32 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4EF51A742F854E57005D9F32 /* Products */;
 			projectDirPath = "";
@@ -629,6 +655,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4EF51D1D2F8773E2005D9F32 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4EF51D1F2F8774C2005D9F32 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4EF51D1D2F8773E2005D9F32 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		4EF51D212F8774CC005D9F32 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4EF51D1D2F8773E2005D9F32 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		4EF51D232F8774D1005D9F32 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4EF51D1D2F8773E2005D9F32 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		4EF51D252F8774DA005D9F32 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4EF51D1D2F8773E2005D9F32 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4EF51A6B2F854E57005D9F32 /* Project object */;
 }

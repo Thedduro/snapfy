@@ -1,3 +1,4 @@
+import FirebaseCore
 import SwiftUI
 import SwiftData
 
@@ -5,6 +6,10 @@ import SwiftData
 struct snapfyApp: App {
     @StateObject private var sessionStore = SessionStore()
     @StateObject private var workspaceStore = WorkspaceStore()
+
+    init() {
+        FirebaseBootstrap.configureIfNeeded()
+    }
 
     var body: some Scene {
         WindowGroup {
