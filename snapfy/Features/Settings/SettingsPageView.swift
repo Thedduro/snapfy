@@ -1,9 +1,11 @@
 import SwiftUI
+import UIKit
 
 struct SettingsPageView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var workspaceStore: WorkspaceStore
     @State private var isPresentingProfileEdit = false
+    @State private var copiedInviteMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -36,6 +38,17 @@ struct SettingsPageView: View {
                             .font(.subheadline.weight(.semibold))
                         Text(currentWorkspace.name)
                             .font(.title3.bold())
+
+                        Button("초대 링크 복사") {
+                            copyInviteLink()
+                        }
+                        .buttonStyle(.bordered)
+
+                        if let copiedInviteMessage {
+                            Text(copiedInviteMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,6 +77,18 @@ struct SettingsPageView: View {
                 ProfileEditView(currentUser: currentUser)
                     .environmentObject(sessionStore)
             }
+        }
+    }
+
+    private func copyInviteLink() {
+        do {
+            let inviteLink = try workspaceStore.inviteLink()
+            UIPasteboard.general.string = inviteLink
+            copiedInviteMessage = "초대 링크를 복사했습니다."
+        } catch let error as WorkspaceError {
+            copiedInviteMessage = error.errorDescription
+        } catch {
+            copiedInviteMessage = WorkspaceError.unknown.errorDescription
         }
     }
 }

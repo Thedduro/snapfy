@@ -30,3 +30,26 @@ struct WorkspaceSummary: Equatable {
     let ownerUserID: UUID
     let inviteToken: String?
 }
+
+@Model
+final class WorkspaceMemberRecord {
+    @Attribute(.unique) var id: UUID
+    var workspaceID: UUID
+    var userID: UUID
+    var role: String
+    var joinedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        workspaceID: UUID,
+        userID: UUID,
+        role: String,
+        joinedAt: Date = .now
+    ) {
+        self.id = id
+        self.workspaceID = workspaceID
+        self.userID = userID
+        self.role = role
+        self.joinedAt = joinedAt
+    }
+}
