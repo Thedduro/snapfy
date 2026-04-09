@@ -33,6 +33,7 @@ private struct SelectedDay: Identifiable {
 
 struct CalendarPageView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var workspaceStore: WorkspaceStore
     @Query(sort: \MediaEntry.createdAt, order: .reverse) private var mediaEntries: [MediaEntry]
 
     @State private var displayedMonth = CalendarDateUtils.startOfMonth(for: .now)
@@ -163,7 +164,13 @@ struct CalendarPageView: View {
     }
 
     private func entries(for day: Date) -> [MediaEntry] {
-        mediaEntries.filter { CalendarDateUtils.isSameDay($0.date, day) }
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            return []
+        }
+
+        return mediaEntries.filter {
+            $0.workspaceID == workspaceID && CalendarDateUtils.isSameDay($0.date, day)
+        }
     }
 
     private func handleMediaResult(_ result: MediaPickerResult, for date: Date) {
@@ -176,23 +183,43 @@ struct CalendarPageView: View {
     }
 
     private func saveImage(_ image: UIImage, for date: Date) {
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            return
+        }
+
         guard let imageData = MediaProcessingUtils.imageData(from: image),
               let thumbnailData = MediaProcessingUtils.thumbnailData(from: image) else {
             return
         }
 
-        let entry = MediaEntry(date: date, imageData: imageData, thumbnailData: thumbnailData, mediaType: "image")
+        let entry = MediaEntry(
+            workspaceID: workspaceID,
+            date: date,
+            imageData: imageData,
+            thumbnailData: thumbnailData,
+            mediaType: "image"
+        )
         modelContext.insert(entry)
         try? modelContext.save()
     }
 
     private func saveVideo(_ url: URL, for date: Date) {
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            return
+        }
+
         guard let videoData = MediaProcessingUtils.videoData(from: url),
               let thumbnailData = MediaProcessingUtils.videoThumbnailData(from: url) else {
             return
         }
 
-        let entry = MediaEntry(date: date, videoData: videoData, thumbnailData: thumbnailData, mediaType: "video")
+        let entry = MediaEntry(
+            workspaceID: workspaceID,
+            date: date,
+            videoData: videoData,
+            thumbnailData: thumbnailData,
+            mediaType: "video"
+        )
         modelContext.insert(entry)
         try? modelContext.save()
     }
