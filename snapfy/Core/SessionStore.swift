@@ -217,7 +217,7 @@ final class SessionStore: ObservableObject, AuthManaging {
 
     private func normalizedPassword(from rawValue: String) throws -> String {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard trimmed.count >= 6 else {
             throw AuthError.invalidPassword
         }
         return trimmed

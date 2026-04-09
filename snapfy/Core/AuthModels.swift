@@ -72,7 +72,7 @@ enum AuthError: LocalizedError {
         case .invalidEmail:
             return "올바른 이메일을 입력해주세요."
         case .invalidPassword:
-            return "비밀번호를 입력해주세요."
+            return "비밀번호는 6자 이상 입력해주세요."
         case .invalidDisplayName:
             return "표시 이름은 2자 이상 입력하거나 비워둘 수 있습니다."
         case .emailAlreadyInUse:

@@ -16,6 +16,14 @@ struct SignUpView: View {
     @State private var displayName = ""
     @State private var errorMessage: String?
     @State private var isSubmitting = false
+    
+    private var trimmedPassword: String {
+        password.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private var isPasswordValid: Bool {
+        trimmedPassword.count >= 6
+    }
 
     var body: some View {
         ScrollView {
@@ -52,6 +60,26 @@ struct SignUpView: View {
                             .autocorrectionDisabled()
                             .padding(14)
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                        
+                        if mode == .signUp {
+                            HStack(spacing: 8) {
+                                Image(systemName: isPasswordValid ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                Text("비밀번호 6자 이상")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(isPasswordValid ? .blue : .red)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                (isPasswordValid ? Color.blue.opacity(0.10) : Color.red.opacity(0.10)),
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(isPasswordValid ? Color.blue.opacity(0.45) : Color.red.opacity(0.45), lineWidth: 1)
+                            )
+                        }
                     }
 
                     if mode == .signUp {
