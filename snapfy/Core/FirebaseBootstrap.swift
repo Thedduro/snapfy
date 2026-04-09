@@ -1,6 +1,5 @@
 import FirebaseCore
 import FirebaseFirestore
-import FirebaseFunctions
 
 enum FirebaseBootstrap {
     static func configureIfNeeded() {
@@ -18,9 +17,5 @@ enum FirebaseBootstrap {
 
     static var firestore: Firestore {
         Firestore.firestore()
-    }
-
-    static var functions: Functions {
-        Functions.functions()
     }
 }
