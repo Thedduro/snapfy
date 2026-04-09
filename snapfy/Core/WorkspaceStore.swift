@@ -199,6 +199,22 @@ final class WorkspaceStore: ObservableObject {
         try joinWorkspace(withInviteToken: token, userID: userID)
     }
 
+    func joinWorkspace(withInput input: String, userID: UUID) throws {
+        let trimmedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedInput.isEmpty else {
+            throw WorkspaceError.invalidInvite
+        }
+
+        if let url = URL(string: trimmedInput),
+           trimmedInput.contains("://") {
+            try handleIncomingURL(url, userID: userID)
+            return
+        }
+
+        try joinWorkspace(withInviteToken: trimmedInput, userID: userID)
+    }
+
     func selectWorkspace(_ workspace: WorkspaceSummary) {
         UserDefaults.standard.set(
             workspace.id.uuidString,

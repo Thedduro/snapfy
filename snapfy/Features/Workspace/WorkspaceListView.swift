@@ -6,6 +6,7 @@ struct WorkspaceListView: View {
 
     @State private var selectedWorkspace: WorkspaceSummary?
     @State private var isPresentingWorkspaceSetup = false
+    @State private var isPresentingJoinWorkspace = false
 
     var body: some View {
         List {
@@ -48,17 +49,26 @@ struct WorkspaceListView: View {
             } header: {
                 Text("워크스페이스")
             }
-
-            if workspaceStore.canCreateWorkspace {
-                Section {
-                    Button("새 워크스페이스 만들기") {
-                        isPresentingWorkspaceSetup = true
-                    }
-                }
-            }
         }
         .navigationTitle("캘린더")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if workspaceStore.canCreateWorkspace {
+                        Button("새 공간 만들기", systemImage: "plus.square.on.square") {
+                            isPresentingWorkspaceSetup = true
+                        }
+                    }
+
+                    Button("공간 참여하기", systemImage: "person.badge.plus") {
+                        isPresentingJoinWorkspace = true
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
         .navigationDestination(item: $selectedWorkspace) { workspace in
             CalendarPageView()
                 .navigationTitle(workspace.name)
@@ -66,6 +76,11 @@ struct WorkspaceListView: View {
         }
         .sheet(isPresented: $isPresentingWorkspaceSetup) {
             WorkspaceSetupView()
+                .environmentObject(sessionStore)
+                .environmentObject(workspaceStore)
+        }
+        .sheet(isPresented: $isPresentingJoinWorkspace) {
+            JoinWorkspaceView()
                 .environmentObject(sessionStore)
                 .environmentObject(workspaceStore)
         }
