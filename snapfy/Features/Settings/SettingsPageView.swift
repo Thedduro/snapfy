@@ -55,6 +55,12 @@ struct SettingsPageView: View {
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
                 }
 
+                if !workspaceStore.workspaces.isEmpty {
+                    Text("보유 스페이스 \(workspaceStore.ownedWorkspaceCount)/5")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Button("로그아웃") {
                     sessionStore.signOut()
                 }

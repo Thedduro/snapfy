@@ -17,10 +17,6 @@ struct ContentView: View {
                 NavigationStack {
                     SignUpView()
                 }
-            } else if workspaceStore.currentWorkspace == nil {
-                NavigationStack {
-                    WorkspaceSetupView()
-                }
             } else {
                 TabView(selection: $selectedTab) {
                     NavigationStack {
@@ -32,7 +28,7 @@ struct ContentView: View {
                     .tag(AppTab.library)
 
                     NavigationStack {
-                        CalendarPageView()
+                        WorkspaceListView()
                     }
                     .tabItem {
                         Label("캘린더", systemImage: "calendar")

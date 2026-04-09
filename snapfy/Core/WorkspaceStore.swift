@@ -4,11 +4,14 @@ import SwiftData
 
 @MainActor
 final class WorkspaceStore: ObservableObject {
+    @Published private(set) var workspaces: [WorkspaceSummary] = []
     @Published private(set) var currentWorkspace: WorkspaceSummary?
 
     private let container: ModelContainer
     private let currentWorkspaceDefaultsKey = "workspace.currentWorkspaceID"
     private let inviteScheme = "snapfy"
+    private let maxOwnedWorkspaceCount = 5
+    private var currentUserID: UUID?
 
     init(container: ModelContainer? = nil) {
         self.container = container ?? PersistenceController.shared
@@ -16,14 +19,18 @@ final class WorkspaceStore: ObservableObject {
 
     func syncSession(user: AuthenticatedUser?) {
         guard let user else {
+            currentUserID = nil
+            workspaces = []
             currentWorkspace = nil
             UserDefaults.standard.removeObject(forKey: currentWorkspaceDefaultsKey)
             return
         }
+        currentUserID = user.id
 
         do {
-            try restoreWorkspace(for: user.id)
+            try loadWorkspaces(for: user.id)
         } catch {
+            workspaces = []
             currentWorkspace = nil
         }
     }
@@ -36,6 +43,16 @@ final class WorkspaceStore: ObservableObject {
         }
 
         let context = ModelContext(container)
+        let ownedWorkspaceCount = try context.fetchCount(
+            FetchDescriptor<WorkspaceRecord>(
+                predicate: #Predicate { $0.ownerUserID == ownerUserID }
+            )
+        )
+
+        guard ownedWorkspaceCount < maxOwnedWorkspaceCount else {
+            throw WorkspaceError.workspaceLimitReached
+        }
+
         let workspace = WorkspaceRecord(
             name: trimmedName,
             ownerUserID: ownerUserID
@@ -56,50 +73,57 @@ final class WorkspaceStore: ObservableObject {
             throw WorkspaceError.unknown
         }
 
+        try loadWorkspaces(for: ownerUserID)
         persistCurrentWorkspace(workspace)
     }
 
-    func restoreWorkspace(for ownerUserID: UUID) throws {
+    func loadWorkspaces(for userID: UUID) throws {
         let context = ModelContext(container)
+        var membershipDescriptor = FetchDescriptor<WorkspaceMemberRecord>(
+            predicate: #Predicate { $0.userID == userID },
+            sortBy: [SortDescriptor(\.joinedAt, order: .reverse)]
+        )
+        let memberships = try context.fetch(membershipDescriptor)
 
-        if let storedID = storedWorkspaceID() {
-            var selectedDescriptor = FetchDescriptor<WorkspaceRecord>(
-                predicate: #Predicate { $0.id == storedID }
+        guard !memberships.isEmpty else {
+            workspaces = []
+            UserDefaults.standard.removeObject(forKey: currentWorkspaceDefaultsKey)
+            currentWorkspace = nil
+            return
+        }
+
+        let workspaceIDs = Set(memberships.map(\.workspaceID))
+        var resolvedWorkspaces: [WorkspaceSummary] = []
+
+        for workspaceID in workspaceIDs {
+            var workspaceDescriptor = FetchDescriptor<WorkspaceRecord>(
+                predicate: #Predicate { $0.id == workspaceID }
             )
-            selectedDescriptor.fetchLimit = 1
+            workspaceDescriptor.fetchLimit = 1
 
-            if let workspace = try context.fetch(selectedDescriptor).first,
-               try isMember(of: workspace.id, userID: ownerUserID, context: context) {
-                persistCurrentWorkspace(workspace)
-                return
+            if let workspace = try context.fetch(workspaceDescriptor).first {
+                resolvedWorkspaces.append(
+                    WorkspaceSummary(
+                        id: workspace.id,
+                        name: workspace.name,
+                        ownerUserID: workspace.ownerUserID,
+                        inviteToken: workspace.inviteToken
+                    )
+                )
             }
         }
 
-        var membershipDescriptor = FetchDescriptor<WorkspaceMemberRecord>(
-            predicate: #Predicate { $0.userID == ownerUserID },
-            sortBy: [SortDescriptor(\.joinedAt, order: .reverse)]
-        )
-        membershipDescriptor.fetchLimit = 1
-
-        guard let membership = try context.fetch(membershipDescriptor).first else {
-            UserDefaults.standard.removeObject(forKey: currentWorkspaceDefaultsKey)
-            currentWorkspace = nil
-            return
-        }
-        let workspaceID = membership.workspaceID
-
-        var workspaceDescriptor = FetchDescriptor<WorkspaceRecord>(
-            predicate: #Predicate { $0.id == workspaceID }
-        )
-        workspaceDescriptor.fetchLimit = 1
-
-        guard let workspace = try context.fetch(workspaceDescriptor).first else {
-            UserDefaults.standard.removeObject(forKey: currentWorkspaceDefaultsKey)
-            currentWorkspace = nil
-            return
+        workspaces = resolvedWorkspaces.sorted { lhs, rhs in
+            lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
 
-        persistCurrentWorkspace(workspace)
+        if let storedID = storedWorkspaceID(),
+           let storedWorkspace = workspaces.first(where: { $0.id == storedID }) {
+            currentWorkspace = storedWorkspace
+        } else {
+            currentWorkspace = nil
+            UserDefaults.standard.removeObject(forKey: currentWorkspaceDefaultsKey)
+        }
     }
 
     func inviteLink() throws -> String {
@@ -159,6 +183,7 @@ final class WorkspaceStore: ObservableObject {
             }
         }
 
+        try loadWorkspaces(for: userID)
         persistCurrentWorkspace(workspace)
     }
 
@@ -172,6 +197,26 @@ final class WorkspaceStore: ObservableObject {
         }
 
         try joinWorkspace(withInviteToken: token, userID: userID)
+    }
+
+    func selectWorkspace(_ workspace: WorkspaceSummary) {
+        UserDefaults.standard.set(
+            workspace.id.uuidString,
+            forKey: currentWorkspaceDefaultsKey
+        )
+        currentWorkspace = workspace
+    }
+
+    var canCreateWorkspace: Bool {
+        ownedWorkspaceCount < maxOwnedWorkspaceCount
+    }
+
+    var ownedWorkspaceCount: Int {
+        guard let currentUserID else {
+            return 0
+        }
+
+        return workspaces.filter { $0.ownerUserID == currentUserID }.count
     }
 
     private func storedWorkspaceID() -> UUID? {
@@ -188,12 +233,20 @@ final class WorkspaceStore: ObservableObject {
             forKey: currentWorkspaceDefaultsKey
         )
 
-        currentWorkspace = WorkspaceSummary(
+        let summary = WorkspaceSummary(
             id: workspace.id,
             name: workspace.name,
             ownerUserID: workspace.ownerUserID,
             inviteToken: workspace.inviteToken
         )
+        currentWorkspace = summary
+
+        if let index = workspaces.firstIndex(where: { $0.id == summary.id }) {
+            workspaces[index] = summary
+        } else {
+            workspaces.append(summary)
+            workspaces.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
     }
 
     private func isMember(
@@ -215,6 +268,7 @@ final class WorkspaceStore: ObservableObject {
 enum WorkspaceError: LocalizedError {
     case invalidName
     case invalidInvite
+    case workspaceLimitReached
     case workspaceNotFound
     case unknown
 
@@ -224,6 +278,8 @@ enum WorkspaceError: LocalizedError {
             return "워크스페이스 이름은 2자 이상 입력해주세요."
         case .invalidInvite:
             return "유효한 초대 링크가 아닙니다."
+        case .workspaceLimitReached:
+            return "워크스페이스는 최대 5개까지 만들 수 있습니다."
         case .workspaceNotFound:
             return "현재 워크스페이스를 찾을 수 없습니다."
         case .unknown:

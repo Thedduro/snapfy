@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct WorkspaceSetupView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var workspaceStore: WorkspaceStore
 
@@ -87,6 +88,7 @@ struct WorkspaceSetupView: View {
                 name: workspaceName,
                 ownerUserID: userID
             )
+            dismiss()
         } catch let error as WorkspaceError {
             errorMessage = error.errorDescription
         } catch {
