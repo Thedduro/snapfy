@@ -1,11 +1,19 @@
 import SwiftUI
 
+private enum AuthScreenMode: String, CaseIterable, Identifiable {
+    case signIn = "로그인"
+    case signUp = "회원가입"
+
+    var id: String { rawValue }
+}
+
 struct SignUpView: View {
     @EnvironmentObject private var sessionStore: SessionStore
 
+    @State private var mode: AuthScreenMode = .signIn
     @State private var email = ""
+    @State private var password = ""
     @State private var displayName = ""
-    @State private var needsProfileSetup = false
     @State private var errorMessage: String?
     @State private var isSubmitting = false
 
@@ -18,6 +26,13 @@ struct SignUpView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 16) {
+                    Picker("인증 모드", selection: $mode) {
+                        ForEach(AuthScreenMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("이메일")
                             .font(.subheadline.weight(.semibold))
@@ -29,7 +44,17 @@ struct SignUpView: View {
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
                     }
 
-                    if needsProfileSetup {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("비밀번호")
+                            .font(.subheadline.weight(.semibold))
+                        SecureField("비밀번호", text: $password)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(14)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    if mode == .signUp {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("표시 이름")
                                 .font(.subheadline.weight(.semibold))
@@ -54,7 +79,7 @@ struct SignUpView: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text(needsProfileSetup ? "계정 만들기" : "계속")
+                                Text(mode == .signIn ? "로그인" : "회원가입")
                                     .fontWeight(.semibold)
                             }
                             Spacer()
@@ -77,10 +102,12 @@ struct SignUpView: View {
         }
         .background(Color(.systemGroupedBackground))
         .onChange(of: email) { _, _ in
-            if needsProfileSetup {
-                needsProfileSetup = false
-                displayName = ""
-            }
+            errorMessage = nil
+        }
+        .onChange(of: password) { _, _ in
+            errorMessage = nil
+        }
+        .onChange(of: mode) { _, _ in
             errorMessage = nil
         }
     }
@@ -89,36 +116,26 @@ struct SignUpView: View {
         errorMessage = nil
         isSubmitting = true
 
-        defer {
-            isSubmitting = false
-        }
+        Task {
+            defer {
+                isSubmitting = false
+            }
 
-        do {
-            if needsProfileSetup {
-                try sessionStore.signInOrCreate(
-                    SignUpPayload(
+            do {
+                if mode == .signIn {
+                    try await sessionStore.signIn(email: email, password: password)
+                } else {
+                    try await sessionStore.signUp(
                         email: email,
+                        password: password,
                         displayName: displayName
                     )
-                )
-                return
+                }
+            } catch let error as AuthError {
+                errorMessage = error.errorDescription
+            } catch {
+                errorMessage = AuthError.unknown.errorDescription
             }
-
-            switch try sessionStore.lookupUser(email: email) {
-            case .existingUser:
-                try sessionStore.signInOrCreate(
-                    SignUpPayload(
-                        email: email,
-                        displayName: ""
-                    )
-                )
-            case .newUser:
-                needsProfileSetup = true
-            }
-        } catch let error as AuthError {
-            errorMessage = error.errorDescription
-        } catch {
-            errorMessage = AuthError.unknown.errorDescription
         }
     }
 }

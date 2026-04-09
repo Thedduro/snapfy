@@ -54,19 +54,12 @@ struct AuthenticatedUser: Equatable {
     }
 }
 
-struct SignUpPayload {
-    let email: String
-    let displayName: String
-}
-
-enum AuthLookupResult {
-    case existingUser
-    case newUser
-}
-
 enum AuthError: LocalizedError {
     case invalidEmail
+    case invalidPassword
     case invalidDisplayName
+    case emailAlreadyInUse
+    case invalidCredentials
     case userNotFound
     case unknown
 
@@ -74,8 +67,14 @@ enum AuthError: LocalizedError {
         switch self {
         case .invalidEmail:
             return "올바른 이메일을 입력해주세요."
+        case .invalidPassword:
+            return "비밀번호를 입력해주세요."
         case .invalidDisplayName:
             return "표시 이름은 2자 이상 입력하거나 비워둘 수 있습니다."
+        case .emailAlreadyInUse:
+            return "이미 가입된 이메일입니다."
+        case .invalidCredentials:
+            return "이메일 또는 비밀번호가 올바르지 않습니다."
         case .userNotFound:
             return "사용자 정보를 찾을 수 없습니다."
         case .unknown:

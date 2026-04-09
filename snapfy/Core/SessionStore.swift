@@ -1,12 +1,13 @@
 import Combine
+import FirebaseAuth
 import Foundation
 import SwiftData
 
 protocol AuthManaging {
     @MainActor var currentUser: AuthenticatedUser? { get }
-    @MainActor func restoreSession() throws
-    @MainActor func lookupUser(email: String) throws -> AuthLookupResult
-    @MainActor func signInOrCreate(_ payload: SignUpPayload) throws
+    @MainActor func restoreSession() async
+    @MainActor func signIn(email: String, password: String) async throws
+    @MainActor func signUp(email: String, password: String, displayName: String) async throws
     @MainActor func updateProfile(displayName: String, profileImageData: Data?) throws
     @MainActor func signOut()
 }
@@ -21,62 +22,84 @@ final class SessionStore: ObservableObject, AuthManaging {
     init(container: ModelContainer? = nil) {
         self.container = container ?? PersistenceController.shared
 
-        do {
-            try restoreSession()
-        } catch {
-            currentUser = nil
+        Task { @MainActor in
+            await restoreSession()
         }
     }
 
-    func restoreSession() throws {
-        guard let storedID = UserDefaults.standard.string(forKey: currentUserDefaultsKey),
-              let userID = UUID(uuidString: storedID) else {
+    func restoreSession() async {
+        guard let firebaseUser = Auth.auth().currentUser,
+              let email = firebaseUser.email else {
             currentUser = nil
             return
         }
 
-        guard let user = try fetchUser(id: userID) else {
-            UserDefaults.standard.removeObject(forKey: currentUserDefaultsKey)
-            currentUser = nil
-            throw AuthError.userNotFound
-        }
-
-        currentUser = authenticatedUser(from: user)
-    }
-
-    func lookupUser(email: String) throws -> AuthLookupResult {
-        let normalizedEmail = try normalizedEmail(from: email)
-        let existingUser = try fetchUser(email: normalizedEmail)
-        return existingUser == nil ? .newUser : .existingUser
-    }
-
-    func signInOrCreate(_ payload: SignUpPayload) throws {
-        let normalizedEmail = try normalizedEmail(from: payload.email)
-
-        if let user = try fetchUser(email: normalizedEmail) {
+        do {
+            let user = try upsertLocalUser(
+                email: email,
+                displayName: firebaseUser.displayName,
+                externalAuthID: firebaseUser.uid
+            )
             UserDefaults.standard.set(user.id.uuidString, forKey: currentUserDefaultsKey)
             currentUser = authenticatedUser(from: user)
             return
+        } catch {
+            currentUser = nil
         }
+    }
 
-        let normalizedDisplayName = try normalizedDisplayName(from: payload.displayName)
-
-        let context = ModelContext(container)
-        let user = UserAccount(
-            email: normalizedEmail,
-            displayName: normalizedDisplayName
-        )
-
-        context.insert(user)
+    func signIn(email: String, password: String) async throws {
+        let normalizedEmail = try normalizedEmail(from: email)
+        let normalizedPassword = try normalizedPassword(from: password)
 
         do {
-            try context.save()
+            let result = try await firebaseSignIn(
+                email: normalizedEmail,
+                password: normalizedPassword
+            )
+            let firebaseUser = result.user
+            let user = try upsertLocalUser(
+                email: normalizedEmail,
+                displayName: firebaseUser.displayName,
+                externalAuthID: firebaseUser.uid
+            )
+            UserDefaults.standard.set(user.id.uuidString, forKey: currentUserDefaultsKey)
+            currentUser = authenticatedUser(from: user)
         } catch {
-            throw AuthError.unknown
+            throw mapFirebaseError(error)
         }
+    }
 
-        UserDefaults.standard.set(user.id.uuidString, forKey: currentUserDefaultsKey)
-        currentUser = authenticatedUser(from: user)
+    func signUp(email: String, password: String, displayName: String) async throws {
+        let normalizedEmail = try normalizedEmail(from: email)
+        let normalizedPassword = try normalizedPassword(from: password)
+        let normalizedDisplayName = try normalizedDisplayName(from: displayName)
+
+        do {
+            let result = try await firebaseSignUp(
+                email: normalizedEmail,
+                password: normalizedPassword
+            )
+
+            if let normalizedDisplayName {
+                try await updateFirebaseDisplayName(
+                    user: result.user,
+                    displayName: normalizedDisplayName
+                )
+            }
+
+            let refreshedDisplayName = normalizedDisplayName ?? result.user.displayName
+            let user = try upsertLocalUser(
+                email: normalizedEmail,
+                displayName: refreshedDisplayName,
+                externalAuthID: result.user.uid
+            )
+
+            UserDefaults.standard.set(user.id.uuidString, forKey: currentUserDefaultsKey)
+            currentUser = authenticatedUser(from: user)
+        } catch {
+            throw mapFirebaseError(error)
+        }
     }
 
     func updateProfile(displayName: String, profileImageData: Data?) throws {
@@ -108,6 +131,7 @@ final class SessionStore: ObservableObject, AuthManaging {
     }
 
     func signOut() {
+        try? Auth.auth().signOut()
         UserDefaults.standard.removeObject(forKey: currentUserDefaultsKey)
         currentUser = nil
     }
@@ -139,6 +163,37 @@ final class SessionStore: ObservableObject, AuthManaging {
         return try context.fetch(descriptor).first
     }
 
+    private func upsertLocalUser(
+        email: String,
+        displayName: String?,
+        externalAuthID: String
+    ) throws -> UserAccount {
+        if let existing = try fetchUser(email: email) {
+            existing.externalAuthID = externalAuthID
+            existing.authProvider = "firebase_email_password"
+            if let displayName, !displayName.isEmpty {
+                existing.displayName = displayName
+            }
+
+            guard let modelContext = existing.modelContext else {
+                throw AuthError.unknown
+            }
+            try modelContext.save()
+            return existing
+        }
+
+        let context = ModelContext(container)
+        let user = UserAccount(
+            email: email,
+            displayName: displayName,
+            authProvider: "firebase_email_password",
+            externalAuthID: externalAuthID
+        )
+        context.insert(user)
+        try context.save()
+        return user
+    }
+
     private func normalizedEmail(from rawValue: String) throws -> String {
         let trimmed = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -160,6 +215,14 @@ final class SessionStore: ObservableObject, AuthManaging {
         return trimmed
     }
 
+    private func normalizedPassword(from rawValue: String) throws -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw AuthError.invalidPassword
+        }
+        return trimmed
+    }
+
     private func normalizedDisplayName(from rawValue: String) throws -> String? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -172,5 +235,66 @@ final class SessionStore: ObservableObject, AuthManaging {
         }
 
         return trimmed
+    }
+
+    private func firebaseSignIn(email: String, password: String) async throws -> AuthDataResult {
+        try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().signIn(withEmail: email, password: password) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let result {
+                    continuation.resume(returning: result)
+                } else {
+                    continuation.resume(throwing: AuthError.unknown)
+                }
+            }
+        }
+    }
+
+    private func firebaseSignUp(email: String, password: String) async throws -> AuthDataResult {
+        try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().createUser(withEmail: email, password: password) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let result {
+                    continuation.resume(returning: result)
+                } else {
+                    continuation.resume(throwing: AuthError.unknown)
+                }
+            }
+        }
+    }
+
+    private func updateFirebaseDisplayName(user: User, displayName: String) async throws {
+        let request = user.createProfileChangeRequest()
+        request.displayName = displayName
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            request.commitChanges { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+    }
+
+    private func mapFirebaseError(_ error: Error) -> AuthError {
+        let nsError = error as NSError
+        let code = AuthErrorCode(rawValue: nsError.code)
+
+        switch code {
+        case .some(.invalidEmail):
+            return .invalidEmail
+        case .some(.emailAlreadyInUse):
+            return .emailAlreadyInUse
+        case .some(.weakPassword):
+            return .invalidPassword
+        case .some(.wrongPassword), .some(.invalidCredential), .some(.userNotFound):
+            return .invalidCredentials
+        default:
+            return .unknown
+        }
     }
 }
