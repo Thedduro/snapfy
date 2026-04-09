@@ -225,14 +225,16 @@ struct CalendarPageView: View {
     }
 
     private func presentWorkspaceShareSheet() {
-        do {
-            let inviteLink = try workspaceStore.inviteLink()
-            shareItems = [inviteLink]
-            isShowingShareSheet = true
-        } catch let error as WorkspaceError {
-            shareErrorMessage = error.errorDescription
-        } catch {
-            shareErrorMessage = WorkspaceError.unknown.errorDescription
+        Task {
+            do {
+                let inviteLink = try await workspaceStore.inviteLink()
+                shareItems = [inviteLink]
+                isShowingShareSheet = true
+            } catch let error as WorkspaceError {
+                shareErrorMessage = error.errorDescription
+            } catch {
+                shareErrorMessage = WorkspaceError.unknown.errorDescription
+            }
         }
     }
 

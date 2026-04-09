@@ -18,7 +18,9 @@ struct snapfyApp: App {
                 .environmentObject(workspaceStore)
                 .onOpenURL { url in
                     guard let userID = sessionStore.currentUser?.id else { return }
-                    try? workspaceStore.handleIncomingURL(url, userID: userID)
+                    Task {
+                        try? await workspaceStore.handleIncomingURL(url, userID: userID)
+                    }
                 }
         }
         .modelContainer(PersistenceController.shared)
