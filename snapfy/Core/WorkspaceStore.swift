@@ -285,17 +285,19 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
         }
 
         let nsError = error as NSError
+        print("Workspace Firestore error:", nsError.domain, nsError.code, nsError.localizedDescription)
+        print("Workspace Firestore userInfo:", nsError.userInfo)
         if nsError.domain == FirestoreErrorDomain,
            let code = FirestoreErrorCode.Code(rawValue: nsError.code) {
             switch code {
             case .permissionDenied:
                 return .permissionDenied
             default:
-                break
+                return .firestore("Firestore 오류(\(code.rawValue)): \(nsError.localizedDescription)")
             }
         }
 
-        return .unknown
+        return .firestore(nsError.localizedDescription)
     }
 }
 
@@ -306,6 +308,7 @@ enum WorkspaceError: LocalizedError {
     case workspaceNotFound
     case authenticationRequired
     case permissionDenied
+    case firestore(String)
     case unknown
 
     var errorDescription: String? {
@@ -322,6 +325,8 @@ enum WorkspaceError: LocalizedError {
             return "로그인이 필요합니다. 다시 로그인해주세요."
         case .permissionDenied:
             return "권한이 없어 워크스페이스를 처리할 수 없습니다. 로그인 상태 또는 Firestore 규칙을 확인해주세요."
+        case .firestore(let message):
+            return message
         case .unknown:
             return "워크스페이스를 처리하지 못했습니다."
         }

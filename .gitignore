@@ -27,3 +27,7 @@ DerivedData/
 .env
 .env.*
 !.env.example
+
+# Firebase iOS config (keep local/private)
+GoogleService-Info.plist
+**/GoogleService-Info.plist
