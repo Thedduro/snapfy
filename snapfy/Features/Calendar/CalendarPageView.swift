@@ -46,6 +46,7 @@ struct CalendarPageView: View {
     @State private var shareErrorMessage: String?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+    private let mediaStore = LocalMediaStore()
 
     var body: some View {
         ScrollView {
@@ -206,13 +207,11 @@ struct CalendarPageView: View {
     }
 
     private func entries(for day: Date) -> [MediaEntry] {
-        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
-            return []
-        }
-
-        return mediaEntries.filter {
-            $0.workspaceID == workspaceID && CalendarDateUtils.isSameDay($0.date, day)
-        }
+        mediaStore.entries(
+            for: day,
+            workspaceID: workspaceStore.currentWorkspace?.id,
+            in: mediaEntries
+        )
     }
 
     private func handleMediaResult(_ result: MediaPickerResult, for date: Date) {
@@ -228,42 +227,24 @@ struct CalendarPageView: View {
         guard let workspaceID = workspaceStore.currentWorkspace?.id else {
             return
         }
-
-        guard let imageData = MediaProcessingUtils.imageData(from: image),
-              let thumbnailData = MediaProcessingUtils.thumbnailData(from: image) else {
-            return
-        }
-
-        let entry = MediaEntry(
+        try? mediaStore.saveImage(
+            image,
+            for: date,
             workspaceID: workspaceID,
-            date: date,
-            imageData: imageData,
-            thumbnailData: thumbnailData,
-            mediaType: "image"
+            context: modelContext
         )
-        modelContext.insert(entry)
-        try? modelContext.save()
     }
 
     private func saveVideo(_ url: URL, for date: Date) {
         guard let workspaceID = workspaceStore.currentWorkspace?.id else {
             return
         }
-
-        guard let videoData = MediaProcessingUtils.videoData(from: url),
-              let thumbnailData = MediaProcessingUtils.videoThumbnailData(from: url) else {
-            return
-        }
-
-        let entry = MediaEntry(
+        try? mediaStore.saveVideo(
+            url,
+            for: date,
             workspaceID: workspaceID,
-            date: date,
-            videoData: videoData,
-            thumbnailData: thumbnailData,
-            mediaType: "video"
+            context: modelContext
         )
-        modelContext.insert(entry)
-        try? modelContext.save()
     }
 }
 

@@ -3,7 +3,7 @@ import Foundation
 import SwiftData
 
 @MainActor
-final class WorkspaceStore: ObservableObject {
+final class WorkspaceStore: ObservableObject, WorkspaceManaging {
     @Published private(set) var workspaces: [WorkspaceSummary] = []
     @Published private(set) var currentWorkspace: WorkspaceSummary?
 
