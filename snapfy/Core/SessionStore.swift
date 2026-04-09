@@ -283,6 +283,8 @@ final class SessionStore: ObservableObject, AuthManaging {
     private func mapFirebaseError(_ error: Error) -> AuthError {
         let nsError = error as NSError
         let code = AuthErrorCode(rawValue: nsError.code)
+        print("FirebaseAuth error:", nsError.domain, nsError.code, nsError.localizedDescription)
+        print("FirebaseAuth userInfo:", nsError.userInfo)
 
         switch code {
         case .some(.invalidEmail):
@@ -291,6 +293,14 @@ final class SessionStore: ObservableObject, AuthManaging {
             return .emailAlreadyInUse
         case .some(.weakPassword):
             return .invalidPassword
+        case .some(.operationNotAllowed):
+            return .emailPasswordAuthDisabled
+        case .some(.tooManyRequests):
+            return .tooManyRequests
+        case .some(.networkError):
+            return .networkError
+        case .some(.appNotAuthorized), .some(.invalidAPIKey), .some(.internalError):
+            return .appConfigurationError
         case .some(.wrongPassword), .some(.invalidCredential), .some(.userNotFound):
             return .invalidCredentials
         default:

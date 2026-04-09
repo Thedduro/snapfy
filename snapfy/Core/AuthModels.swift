@@ -60,6 +60,10 @@ enum AuthError: LocalizedError {
     case invalidDisplayName
     case emailAlreadyInUse
     case invalidCredentials
+    case emailPasswordAuthDisabled
+    case tooManyRequests
+    case networkError
+    case appConfigurationError
     case userNotFound
     case unknown
 
@@ -75,6 +79,14 @@ enum AuthError: LocalizedError {
             return "이미 가입된 이메일입니다."
         case .invalidCredentials:
             return "이메일 또는 비밀번호가 올바르지 않습니다."
+        case .emailPasswordAuthDisabled:
+            return "Firebase 콘솔에서 이메일/비밀번호 로그인을 활성화해주세요."
+        case .tooManyRequests:
+            return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+        case .networkError:
+            return "네트워크 연결을 확인해주세요."
+        case .appConfigurationError:
+            return "앱 Firebase 설정이 올바르지 않습니다. 번들 ID와 GoogleService-Info.plist를 확인해주세요."
         case .userNotFound:
             return "사용자 정보를 찾을 수 없습니다."
         case .unknown:

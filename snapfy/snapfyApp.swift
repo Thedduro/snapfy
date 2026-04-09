@@ -4,11 +4,13 @@ import SwiftData
 
 @main
 struct snapfyApp: App {
-    @StateObject private var sessionStore = SessionStore()
-    @StateObject private var workspaceStore = WorkspaceStore()
+    @StateObject private var sessionStore: SessionStore
+    @StateObject private var workspaceStore: WorkspaceStore
 
     init() {
         FirebaseBootstrap.configureIfNeeded()
+        _sessionStore = StateObject(wrappedValue: SessionStore())
+        _workspaceStore = StateObject(wrappedValue: WorkspaceStore())
     }
 
     var body: some Scene {
