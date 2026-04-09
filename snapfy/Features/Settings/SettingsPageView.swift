@@ -1,11 +1,8 @@
 import SwiftUI
-import UIKit
 
 struct SettingsPageView: View {
     @EnvironmentObject private var sessionStore: SessionStore
-    @EnvironmentObject private var workspaceStore: WorkspaceStore
     @State private var isPresentingProfileEdit = false
-    @State private var copiedInviteMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -32,35 +29,6 @@ struct SettingsPageView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                if let currentWorkspace = workspaceStore.currentWorkspace {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("현재 워크스페이스")
-                            .font(.subheadline.weight(.semibold))
-                        Text(currentWorkspace.name)
-                            .font(.title3.bold())
-
-                        Button("초대 링크 복사") {
-                            copyInviteLink()
-                        }
-                        .buttonStyle(.bordered)
-
-                        if let copiedInviteMessage {
-                            Text(copiedInviteMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-                }
-
-                if !workspaceStore.workspaces.isEmpty {
-                    Text("보유 스페이스 \(workspaceStore.ownedWorkspaceCount)/5")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
                 Button("로그아웃") {
                     sessionStore.signOut()
                 }
@@ -83,18 +51,6 @@ struct SettingsPageView: View {
                 ProfileEditView(currentUser: currentUser)
                     .environmentObject(sessionStore)
             }
-        }
-    }
-
-    private func copyInviteLink() {
-        do {
-            let inviteLink = try workspaceStore.inviteLink()
-            UIPasteboard.general.string = inviteLink
-            copiedInviteMessage = "초대 링크를 복사했습니다."
-        } catch let error as WorkspaceError {
-            copiedInviteMessage = error.errorDescription
-        } catch {
-            copiedInviteMessage = WorkspaceError.unknown.errorDescription
         }
     }
 }
