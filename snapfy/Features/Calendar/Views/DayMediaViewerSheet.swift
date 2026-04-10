@@ -197,6 +197,7 @@ private struct Swipeable3DCard: View {
 
 private struct DayMediaPage: View {
     let entry: WorkspaceMediaItem
+    @EnvironmentObject private var sessionStore: SessionStore
 
     var body: some View {
         ZStack {
@@ -247,8 +248,37 @@ private struct DayMediaPage: View {
                     ),
                     lineWidth: 1.5
                 )
+
+            // Uploader and Time Badge
+            VStack {
+                Spacer()
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.circle.fill")
+                        Text(uploaderName)
+                        Text("•")
+                        Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.15), radius: 5, y: 3)
+                    
+                    Spacer()
+                }
+                .padding(16)
+            }
         }
         .frame(width: UIScreen.main.bounds.width - 60, height: UIScreen.main.bounds.height * 0.6)
+    }
+
+    private var uploaderName: String {
+        if let currentUser = sessionStore.currentUser, entry.ownerUserID == currentUser.id.uuidString {
+            return currentUser.resolvedDisplayName.isEmpty ? "나" : currentUser.resolvedDisplayName
+        }
+        return "멤버" // TODO: 차후에 Workspace 회원 매핑 정보 연동 필요
     }
 }
 
