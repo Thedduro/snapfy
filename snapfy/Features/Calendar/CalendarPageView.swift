@@ -152,14 +152,18 @@ struct CalendarPageView: View {
                 handleMediaResult(result, for: selectedDate)
             }
         }
-        .sheet(item: $presentedMediaDay) { selectedDay in
+        .fullScreenCover(item: $presentedMediaDay) { selectedDay in
             DayMediaViewerSheet(
                 date: selectedDay.date,
                 entries: entries(for: selectedDay.date),
                 onPick: { result in
                     handleMediaResult(result, for: selectedDay.date)
+                },
+                onDismiss: {
+                    presentedMediaDay = nil
                 }
             )
+            .presentationBackground(.clear)
         }
         .alert(
             "공유할 수 없습니다",

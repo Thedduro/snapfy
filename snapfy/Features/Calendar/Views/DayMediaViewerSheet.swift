@@ -5,7 +5,8 @@ struct DayMediaViewerSheet: View {
     let entries: [WorkspaceMediaItem]
     let onPick: (MediaPickerResult) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    let onDismiss: () -> Void
+
     @State private var activeSource: MediaSource?
     
     // Tracks the current index of the top card
@@ -13,51 +14,17 @@ struct DayMediaViewerSheet: View {
 
     var body: some View {
         ZStack {
-            // Soft gradient spatial background + blur
-            ZStack {
-                Color(.systemBackground).ignoresSafeArea()
-                LinearGradient(
-                    colors: [
-                        Color.blue.opacity(0.1),
-                        Color.purple.opacity(0.15),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+            // Dark dim overlay background
+            Color.black.opacity(0.6)
                 .ignoresSafeArea()
-                
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .ignoresSafeArea()
-            }
+                .onTapGesture {
+                    onDismiss()
+                }
             
-            VStack(spacing: 0) {
-                // Header
+            // Add Button -> Floating at Top Right
+            VStack {
                 HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .padding(12)
-                            .background(.ultraThickMaterial, in: Circle())
-                            .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
-                    }
-                    
                     Spacer()
-                    
-                    VStack(spacing: 4) {
-                        Text(date.formatted(.dateTime.year().month().day()))
-                            .font(.system(.headline, design: .rounded).weight(.bold))
-                            .foregroundStyle(.primary)
-                        
-                        Text(entries.isEmpty ? "미디어가 없습니다" : "\((currentIndex % entries.count) + 1) / \(entries.count)")
-                            .font(.system(.caption, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
                     Menu {
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             Button("카메라", systemImage: "camera") {
@@ -69,20 +36,33 @@ struct DayMediaViewerSheet: View {
                         }
                     } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .padding(12)
-                            .background(.ultraThickMaterial, in: Circle())
-                            .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(14)
+                            .background(Color.white.opacity(0.15), in: Circle())
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 30)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                Spacer()
+            }
+            .zIndex(10) // On top of cards
 
+            VStack(spacing: 0) {
                 if entries.isEmpty {
                     Spacer()
-                    ContentUnavailableView("미디어가 없습니다", systemImage: "photo.on.rectangle.angled")
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 40))
+                        Text("미디어가 없습니다")
+                            .font(.headline)
+                        Text("오른쪽 위 +를 눌러 추가해보세요")
+                            .font(.subheadline)
+                    }
+                    .foregroundColor(.white.opacity(0.8))
                     Spacer()
                 } else {
                     Spacer()
@@ -249,36 +229,60 @@ private struct DayMediaPage: View {
                     lineWidth: 1.5
                 )
 
-            // Uploader and Time Badge
+            // Instagram Story Style Uploader Badge (Top-Left)
             VStack {
-                Spacer()
                 HStack {
                     HStack(spacing: 6) {
-                        Image(systemName: "person.circle.fill")
-                        Text(uploaderName)
-                        Text("•")
-                        Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
+                        profileImage
+                            .scaledToFill()
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(uploaderName)
+                                .font(.system(.caption, design: .rounded).weight(.bold))
+                                .foregroundStyle(.white)
+                            
+                            Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
                     }
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.25), in: Capsule())
                     .background(.ultraThinMaterial, in: Capsule())
-                    .shadow(color: .black.opacity(0.15), radius: 5, y: 3)
+                    .shadow(color: .black.opacity(0.2), radius: 5, y: 2)
                     
                     Spacer()
                 }
                 .padding(16)
+                Spacer()
             }
         }
-        .frame(width: UIScreen.main.bounds.width - 60, height: UIScreen.main.bounds.height * 0.6)
+        .frame(width: UIScreen.main.bounds.width - 60, height: UIScreen.main.bounds.height * 0.66)
     }
 
     private var uploaderName: String {
         if let currentUser = sessionStore.currentUser, entry.ownerUserID == currentUser.id.uuidString {
             return currentUser.resolvedDisplayName.isEmpty ? "나" : currentUser.resolvedDisplayName
         }
-        return "멤버" // TODO: 차후에 Workspace 회원 매핑 정보 연동 필요
+        return "멤버" // TODO: Workspace 회원 매핑 정보 연동 필요
+    }
+
+    @ViewBuilder
+    private var profileImage: some View {
+        if let currentUser = sessionStore.currentUser, entry.ownerUserID == currentUser.id.uuidString,
+           let data = currentUser.profileImageData, let uiImage = UIImage(data: data) {
+            Image(uiImage: uiImage)
+                .resizable()
+        } else {
+            Image(systemName: "person.circle.fill")
+                .resizable()
+                .foregroundStyle(.white.opacity(0.8))
+                .background(Color.gray.opacity(0.3), in: Circle())
+        }
     }
 }
 
