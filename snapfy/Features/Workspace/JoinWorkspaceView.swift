@@ -60,17 +60,19 @@ struct JoinWorkspaceView: View {
         errorMessage = nil
         isSubmitting = true
 
-        defer {
-            isSubmitting = false
-        }
+        Task {
+            defer {
+                isSubmitting = false
+            }
 
-        do {
-            try workspaceStore.joinWorkspace(withInput: inviteInput, userID: userID)
-            dismiss()
-        } catch let error as WorkspaceError {
-            errorMessage = error.errorDescription
-        } catch {
-            errorMessage = WorkspaceError.unknown.errorDescription
+            do {
+                try await workspaceStore.joinWorkspace(withInput: inviteInput, userID: userID)
+                dismiss()
+            } catch let error as WorkspaceError {
+                errorMessage = error.errorDescription
+            } catch {
+                errorMessage = WorkspaceError.unknown.errorDescription
+            }
         }
     }
 }

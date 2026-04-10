@@ -27,7 +27,7 @@ final class WorkspaceRecord {
 struct WorkspaceSummary: Hashable {
     let id: UUID
     let name: String
-    let ownerUserID: UUID
+    let ownerUserID: String
     let inviteToken: String?
 }
 

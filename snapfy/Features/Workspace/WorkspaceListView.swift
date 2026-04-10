@@ -85,7 +85,7 @@ struct WorkspaceListView: View {
                 .environmentObject(workspaceStore)
         }
         .task(id: sessionStore.currentUser?.id) {
-            workspaceStore.syncSession(user: sessionStore.currentUser)
+            await workspaceStore.syncSession(user: sessionStore.currentUser)
         }
     }
 }

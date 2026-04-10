@@ -1,5 +1,4 @@
 import AVKit
-import SwiftData
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -32,20 +31,23 @@ private struct SelectedDay: Identifiable {
 }
 
 struct CalendarPageView: View {
-    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var workspaceStore: WorkspaceStore
-    @Query(sort: \MediaEntry.createdAt, order: .reverse) private var mediaEntries: [MediaEntry]
 
     @State private var displayedMonth = CalendarDateUtils.startOfMonth(for: .now)
     @State private var selectedDate = Date()
+    @State private var monthEntries: [WorkspaceMediaItem] = []
+    @State private var isLoadingMonth = false
     @State private var showingMediaOptions = false
     @State private var activeSource: MediaSource?
     @State private var presentedMediaDay: SelectedDay?
     @State private var shareItems: [Any] = []
     @State private var isShowingShareSheet = false
     @State private var shareErrorMessage: String?
+    @State private var mediaErrorMessage: String?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+    private let mediaStore = FirestoreMediaStore()
 
     var body: some View {
         ScrollView {
@@ -62,13 +64,17 @@ struct CalendarPageView: View {
 
                     ForEach(CalendarDateUtils.monthDays(for: displayedMonth), id: \.self) { day in
                         let dayEntries = entries(for: day)
+                        let dayPrimaryEntry = dayEntries.first
+                        let dayPreviewURL = dayPrimaryEntry?.mediaType == "image"
+                            ? dayPrimaryEntry?.originalURL
+                            : dayPrimaryEntry?.thumbnailURL
 
                         CalendarDayCell(
                             day: day,
                             isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth),
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
-                            thumbnailData: dayEntries.first?.thumbnailData,
-                            isVideo: dayEntries.first?.mediaType == "video",
+                            thumbnailURL: dayPreviewURL,
+                            isVideo: dayPrimaryEntry?.mediaType == "video",
                             isShowingOptions: showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate),
                             onTap: {
                                 let wasSelectedDay = CalendarDateUtils.isSameDay(day, selectedDate)
@@ -107,6 +113,9 @@ struct CalendarPageView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 16)
         }
+        .overlay {
+            CalendarLoadingOverlay(isVisible: isLoadingMonth)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -121,6 +130,17 @@ struct CalendarPageView: View {
                 selectedDate = newValue
                 showingMediaOptions = false
             }
+            Task {
+                await loadMonthEntriesIfPossible(month: newValue)
+            }
+        }
+        .onChange(of: workspaceStore.currentWorkspace?.id) { _, _ in
+            Task {
+                await loadMonthEntriesIfPossible(month: displayedMonth)
+            }
+        }
+        .task {
+            await loadMonthEntriesIfPossible(month: displayedMonth)
         }
         .sheet(isPresented: $isShowingShareSheet) {
             ShareSheet(items: shareItems)
@@ -155,6 +175,21 @@ struct CalendarPageView: View {
             Button("확인", role: .cancel) {}
         } message: {
             Text(shareErrorMessage ?? WorkspaceError.unknown.errorDescription ?? "")
+        }
+        .alert(
+            "미디어를 처리할 수 없습니다",
+            isPresented: Binding(
+                get: { mediaErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        mediaErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(mediaErrorMessage ?? "알 수 없는 오류가 발생했습니다.")
         }
     }
 
@@ -194,76 +229,101 @@ struct CalendarPageView: View {
     }
 
     private func presentWorkspaceShareSheet() {
-        do {
-            let inviteLink = try workspaceStore.inviteLink()
-            shareItems = [inviteLink]
-            isShowingShareSheet = true
-        } catch let error as WorkspaceError {
-            shareErrorMessage = error.errorDescription
-        } catch {
-            shareErrorMessage = WorkspaceError.unknown.errorDescription
+        Task {
+            do {
+                let inviteLink = try await workspaceStore.inviteLink()
+                shareItems = [inviteLink]
+                isShowingShareSheet = true
+            } catch let error as WorkspaceError {
+                shareErrorMessage = error.errorDescription
+            } catch {
+                shareErrorMessage = WorkspaceError.unknown.errorDescription
+            }
         }
     }
 
-    private func entries(for day: Date) -> [MediaEntry] {
-        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
-            return []
-        }
-
-        return mediaEntries.filter {
-            $0.workspaceID == workspaceID && CalendarDateUtils.isSameDay($0.date, day)
-        }
+    private func entries(for day: Date) -> [WorkspaceMediaItem] {
+        mediaStore.entries(
+            for: day,
+            workspaceID: workspaceStore.currentWorkspace?.id,
+            in: monthEntries
+        )
     }
 
     private func handleMediaResult(_ result: MediaPickerResult, for date: Date) {
-        switch result {
-        case .image(let image):
-            saveImage(image, for: date)
-        case .video(let url):
-            saveVideo(url, for: date)
+        Task {
+            switch result {
+            case .image(let image):
+                await saveImage(image, for: date)
+            case .video(let url):
+                await saveVideo(url, for: date)
+            }
         }
     }
 
-    private func saveImage(_ image: UIImage, for date: Date) {
+    private func loadMonthEntriesIfPossible(month: Date) async {
         guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            monthEntries = []
             return
         }
 
-        guard let imageData = MediaProcessingUtils.imageData(from: image),
-              let thumbnailData = MediaProcessingUtils.thumbnailData(from: image) else {
-            return
-        }
+        isLoadingMonth = true
+        defer { isLoadingMonth = false }
 
-        let entry = MediaEntry(
-            workspaceID: workspaceID,
-            date: date,
-            imageData: imageData,
-            thumbnailData: thumbnailData,
-            mediaType: "image"
-        )
-        modelContext.insert(entry)
-        try? modelContext.save()
+        do {
+            monthEntries = try await mediaStore.fetchMonthEntries(
+                workspaceID: workspaceID,
+                month: month
+            )
+        } catch {
+            mediaErrorMessage = error.localizedDescription
+        }
     }
 
-    private func saveVideo(_ url: URL, for date: Date) {
+    private func saveImage(_ image: UIImage, for date: Date) async {
         guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            mediaErrorMessage = FirestoreMediaError.invalidWorkspace.localizedDescription
+            return
+        }
+        guard let userID = sessionStore.currentUser?.id else {
+            mediaErrorMessage = FirestoreMediaError.invalidUser.localizedDescription
             return
         }
 
-        guard let videoData = MediaProcessingUtils.videoData(from: url),
-              let thumbnailData = MediaProcessingUtils.videoThumbnailData(from: url) else {
+        do {
+            let savedEntry = try await mediaStore.saveImage(
+                image,
+                for: date,
+                workspaceID: workspaceID,
+                ownerUserID: userID
+            )
+            monthEntries.insert(savedEntry, at: 0)
+        } catch {
+            mediaErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveVideo(_ url: URL, for date: Date) async {
+        guard let workspaceID = workspaceStore.currentWorkspace?.id else {
+            mediaErrorMessage = FirestoreMediaError.invalidWorkspace.localizedDescription
+            return
+        }
+        guard let userID = sessionStore.currentUser?.id else {
+            mediaErrorMessage = FirestoreMediaError.invalidUser.localizedDescription
             return
         }
 
-        let entry = MediaEntry(
-            workspaceID: workspaceID,
-            date: date,
-            videoData: videoData,
-            thumbnailData: thumbnailData,
-            mediaType: "video"
-        )
-        modelContext.insert(entry)
-        try? modelContext.save()
+        do {
+            let savedEntry = try await mediaStore.saveVideo(
+                url,
+                for: date,
+                workspaceID: workspaceID,
+                ownerUserID: userID
+            )
+            monthEntries.insert(savedEntry, at: 0)
+        } catch {
+            mediaErrorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -271,7 +331,7 @@ private struct CalendarDayCell: View {
     let day: Date
     let isCurrentMonth: Bool
     let isSelected: Bool
-    let thumbnailData: Data?
+    let thumbnailURL: String?
     let isVideo: Bool
     let isShowingOptions: Bool
     let onTap: () -> Void
@@ -290,14 +350,21 @@ private struct CalendarDayCell: View {
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(isSelected ? Color.black.opacity(0.14) : Color(.secondarySystemBackground))
 
-                    if let thumbnailData,
-                       let image = UIImage(data: thumbnailData) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: cellSize.width, height: cellSize.height)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                    if let thumbnailURL,
+                       let url = URL(string: thumbnailURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: cellSize.width, height: cellSize.height)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                            default:
+                                EmptyView()
+                            }
+                        }
                     }
 
                     RoundedRectangle(cornerRadius: cornerRadius)
@@ -403,7 +470,7 @@ private struct CalendarDayActionBubble: View {
 
 private struct DayMediaViewerSheet: View {
     let date: Date
-    let entries: [MediaEntry]
+    let entries: [WorkspaceMediaItem]
     let onPick: (MediaPickerResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -496,22 +563,31 @@ private struct DayMediaViewerSheet: View {
 }
 
 private struct DayMediaPage: View {
-    let entry: MediaEntry
+    let entry: WorkspaceMediaItem
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 24)
                 .fill(Color(.secondarySystemBackground))
 
-            if entry.mediaType == "video", let data = entry.videoData {
-                DayMediaVideoPlayer(entryID: entry.id, videoData: data)
+            if entry.mediaType == "video", let url = URL(string: entry.originalURL) {
+                DayMediaVideoPlayer(videoURL: url)
                     .clipShape(RoundedRectangle(cornerRadius: 24))
-            } else if let data = entry.imageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
+            } else if let url = URL(string: entry.originalURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                    case .failure:
+                        ContentUnavailableView("이미지를 불러올 수 없습니다", systemImage: "photo")
+                    default:
+                        ProgressView()
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -519,29 +595,33 @@ private struct DayMediaPage: View {
 }
 
 private struct DayMediaVideoPlayer: View {
-    let entryID: UUID
-    let videoData: Data
-
-    @State private var player: AVPlayer?
+    let videoURL: URL
+    @State private var player = AVPlayer()
 
     var body: some View {
-        Group {
-            if let player {
-                VideoPlayer(player: player)
-            } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VideoPlayer(player: player)
+            .task(id: videoURL) {
+                player.replaceCurrentItem(with: AVPlayerItem(url: videoURL))
             }
-        }
-        .task(id: entryID) {
-            guard let url = MediaProcessingUtils.temporaryVideoURL(from: videoData, id: entryID) else {
-                player = nil
-                return
+            .onDisappear {
+                player.pause()
             }
-            player = AVPlayer(url: url)
-        }
-        .onDisappear {
-            player?.pause()
+    }
+}
+
+private struct CalendarLoadingOverlay: View {
+    let isVisible: Bool
+
+    var body: some View {
+        if isVisible {
+            VStack {
+                ProgressView("캘린더 동기화 중")
+                    .padding(12)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, 16)
+            .allowsHitTesting(false)
         }
     }
 }
@@ -604,6 +684,7 @@ private struct MediaPickerSheet: UIViewControllerRepresentable {
 #Preview {
     NavigationStack {
         CalendarPageView()
-            .modelContainer(for: [MediaEntry.self], inMemory: true)
+            .environmentObject(SessionStore())
+            .environmentObject(WorkspaceStore())
     }
 }

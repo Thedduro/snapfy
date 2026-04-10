@@ -5,6 +5,7 @@ enum PersistenceController {
     static let shared: ModelContainer = {
         let schema = Schema([MediaEntry.self, UserAccount.self, WorkspaceRecord.self, WorkspaceMemberRecord.self])
         let storeURL = applicationSupportDirectory.appendingPathComponent("MediaCalendar.store")
+        let configuration = ModelConfiguration(schema: schema, url: storeURL)
 
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-reset-store") {
@@ -12,8 +13,17 @@ enum PersistenceController {
         }
         #endif
 
-        let configuration = ModelConfiguration(schema: schema, url: storeURL)
-        return try! ModelContainer(for: schema, configurations: [configuration])
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            resetStoreIfNeeded(at: storeURL)
+
+            do {
+                return try ModelContainer(for: schema, configurations: [configuration])
+            } catch {
+                fatalError("SwiftData 저장소를 초기화하지 못했습니다: \(error.localizedDescription)")
+            }
+        }
     }()
 
     private static var applicationSupportDirectory: URL {
