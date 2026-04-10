@@ -64,13 +64,17 @@ struct CalendarPageView: View {
 
                     ForEach(CalendarDateUtils.monthDays(for: displayedMonth), id: \.self) { day in
                         let dayEntries = entries(for: day)
+                        let dayPrimaryEntry = dayEntries.first
+                        let dayPreviewURL = dayPrimaryEntry?.mediaType == "image"
+                            ? dayPrimaryEntry?.originalURL
+                            : dayPrimaryEntry?.thumbnailURL
 
                         CalendarDayCell(
                             day: day,
                             isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth),
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
-                            thumbnailURL: dayEntries.first?.thumbnailURL,
-                            isVideo: dayEntries.first?.mediaType == "video",
+                            thumbnailURL: dayPreviewURL,
+                            isVideo: dayPrimaryEntry?.mediaType == "video",
                             isShowingOptions: showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate),
                             onTap: {
                                 let wasSelectedDay = CalendarDateUtils.isSameDay(day, selectedDate)
