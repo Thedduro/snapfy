@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-private enum MediaSource: Identifiable {
+enum MediaSource: Identifiable {
     case camera
     case library
 
@@ -22,7 +22,7 @@ private enum MediaSource: Identifiable {
     }
 }
 
-private struct SelectedDay: Identifiable {
+struct SelectedDay: Identifiable {
     let date: Date
 
     var id: String {
@@ -468,131 +468,7 @@ private struct CalendarDayActionBubble: View {
     }
 }
 
-private struct DayMediaViewerSheet: View {
-    let date: Date
-    let entries: [WorkspaceMediaItem]
-    let onPick: (MediaPickerResult) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var activeSource: MediaSource?
-    @State private var selectedIndex = 0
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                if entries.isEmpty {
-                    ContentUnavailableView("미디어가 없습니다", systemImage: "photo.on.rectangle")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    TabView(selection: $selectedIndex) {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                            DayMediaPage(entry: entry)
-                                .tag(index)
-                                .padding(.horizontal, 12)
-                        }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .automatic))
-                    .frame(maxWidth: .infinity, maxHeight: 440)
-
-                    HStack {
-                        Text("\(selectedIndex + 1) / \(entries.count)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Text(date.formatted(.dateTime.year().month().day()))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 20)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 18)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .principal) {
-                    Text(date.formatted(.dateTime.month().day()))
-                        .font(.headline)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                            Button("카메라", systemImage: "camera") {
-                                activeSource = .camera
-                            }
-                        }
-
-                        Button("갤러리", systemImage: "photo.on.rectangle") {
-                            activeSource = .library
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-        }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .sheet(item: $activeSource, onDismiss: {
-            activeSource = nil
-        }) { source in
-            MediaPickerSheet(source: source) { result in
-                onPick(result)
-            }
-        }
-        .onChange(of: entries.count) { _, newCount in
-            if newCount == 0 {
-                selectedIndex = 0
-            } else if selectedIndex >= newCount {
-                selectedIndex = max(0, newCount - 1)
-            } else {
-                selectedIndex = 0
-            }
-        }
-    }
-}
-
-private struct DayMediaPage: View {
-    let entry: WorkspaceMediaItem
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color(.secondarySystemBackground))
-
-            if entry.mediaType == "video", let url = URL(string: entry.originalURL) {
-                DayMediaVideoPlayer(videoURL: url)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-            } else if let url = URL(string: entry.originalURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                    case .failure:
-                        ContentUnavailableView("이미지를 불러올 수 없습니다", systemImage: "photo")
-                    default:
-                        ProgressView()
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
 
 private struct DayMediaVideoPlayer: View {
     let videoURL: URL
@@ -626,12 +502,12 @@ private struct CalendarLoadingOverlay: View {
     }
 }
 
-private enum MediaPickerResult {
+enum MediaPickerResult {
     case image(UIImage)
     case video(URL)
 }
 
-private struct MediaPickerSheet: UIViewControllerRepresentable {
+struct MediaPickerSheet: UIViewControllerRepresentable {
     let source: MediaSource
     let onPick: (MediaPickerResult) -> Void
 
