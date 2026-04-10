@@ -27,14 +27,9 @@ struct WorkspaceListView: View {
                             selectedWorkspace = workspace
                         } label: {
                             HStack {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(workspace.name)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    Text("캘린더 열기")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
+                                Text(workspace.name)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
 
                                 Spacer()
 
@@ -46,22 +41,20 @@ struct WorkspaceListView: View {
                         .buttonStyle(.plain)
                     }
                 }
-            } header: {
-                Text("워크스페이스")
             }
         }
-        .navigationTitle("캘린더")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     if workspaceStore.canCreateWorkspace {
-                        Button("새 공간 만들기", systemImage: "plus.square.on.square") {
+                        Button("만들기", systemImage: "plus.square.on.square") {
                             isPresentingWorkspaceSetup = true
                         }
                     }
 
-                    Button("공간 참여하기", systemImage: "person.badge.plus") {
+                    Button("참여하기", systemImage: "person.badge.plus") {
                         isPresentingJoinWorkspace = true
                     }
                 } label: {
