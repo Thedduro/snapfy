@@ -51,7 +51,7 @@ struct DayMediaViewerSheet: View {
                             .font(.system(.headline, design: .rounded).weight(.bold))
                             .foregroundStyle(.primary)
                         
-                        Text(entries.isEmpty ? "미디어가 없습니다" : "\(min(currentIndex + 1, entries.count)) / \(entries.count)")
+                        Text(entries.isEmpty ? "미디어가 없습니다" : "\((currentIndex % entries.count) + 1) / \(entries.count)")
                             .font(.system(.caption, design: .rounded).weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -86,38 +86,23 @@ struct DayMediaViewerSheet: View {
                     Spacer()
                 } else {
                     Spacer()
-                    // 3D Card Stack
+                    // Endless 3D Card Stack
                     ZStack {
-                        ForEach(Array(entries.enumerated().reversed()), id: \.element.id) { index, entry in
-                            if index >= currentIndex && index < currentIndex + 4 {
+                        if !entries.isEmpty {
+                            let stackDepth = min(4, entries.count)
+                            let upperBound = currentIndex + stackDepth
+                            
+                            ForEach((currentIndex..<upperBound).reversed(), id: \.self) { absoluteIndex in
+                                let mappedIndex = absoluteIndex % entries.count
+                                let entry = entries[mappedIndex]
+                                
                                 Swipeable3DCard(
                                     entry: entry,
-                                    index: index,
+                                    index: absoluteIndex,
                                     currentIndex: $currentIndex,
-                                    totalCount: entries.count
+                                    totalCount: upperBound
                                 )
                             }
-                        }
-                        
-                        if currentIndex >= entries.count {
-                            VStack(spacing: 16) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundStyle(.blue)
-                                Text("모두 확인했습니다")
-                                    .font(.system(.title3, design: .rounded).weight(.bold))
-                                
-                                Button("다시 보기") {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                        currentIndex = 0
-                                    }
-                                }
-                                .padding(.top, 8)
-                                .buttonStyle(.borderedProminent)
-                                .tint(.blue)
-                                .clipShape(Capsule())
-                            }
-                            .transition(.scale.combined(with: .opacity))
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -134,8 +119,8 @@ struct DayMediaViewerSheet: View {
             }
         }
         .onChange(of: entries.count) { _, newCount in
-            if currentIndex >= newCount {
-                currentIndex = max(0, newCount - 1)
+            if newCount == 0 || currentIndex >= newCount {
+                currentIndex = 0
             }
         }
     }
