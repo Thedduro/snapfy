@@ -112,9 +112,21 @@ struct CalendarPageView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 16)
-        }
-        .overlay {
-            CalendarLoadingOverlay(isVisible: isLoadingMonth)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 30)
+                    .onEnded { value in
+                        if value.translation.width < -40 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                shiftMonth(by: 1)
+                            }
+                        } else if value.translation.width > 40 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                shiftMonth(by: -1)
+                            }
+                        }
+                    }
+            )
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -198,28 +210,22 @@ struct CalendarPageView: View {
     }
 
     private var monthHeader: some View {
-        HStack {
-            Button {
-                shiftMonth(by: -1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .frame(width: 36, height: 36)
-            }
-
-            Spacer()
-
+        ZStack {
             Text(CalendarDateUtils.monthTitle(for: displayedMonth))
                 .font(.title3.bold())
-
-            Spacer()
-
-            Button {
-                shiftMonth(by: 1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .frame(width: 36, height: 36)
+            
+            HStack {
+                Spacer()
+                if isLoadingMonth {
+                    ProgressView()
+                        .controlSize(.regular)
+                        .padding(.trailing, 20)
+                        .transition(.opacity)
+                }
             }
         }
+        .padding(.bottom, 8)
+        .animation(.easeInOut(duration: 0.2), value: isLoadingMonth)
     }
 
     private func shiftMonth(by value: Int) {
@@ -489,22 +495,7 @@ private struct DayMediaVideoPlayer: View {
     }
 }
 
-private struct CalendarLoadingOverlay: View {
-    let isVisible: Bool
 
-    var body: some View {
-        if isVisible {
-            VStack {
-                ProgressView("캘린더 동기화 중")
-                    .padding(12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .padding(.top, 16)
-            .allowsHitTesting(false)
-        }
-    }
-}
 
 enum MediaPickerResult {
     case image(UIImage)
