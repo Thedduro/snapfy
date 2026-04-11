@@ -26,13 +26,22 @@ struct SignUpView: View {
     }
 
     var body: some View {
+        formView
+            .background(Color(.systemGroupedBackground))
+        .onChange(of: email) { _, _ in
+            errorMessage = nil
+        }
+        .onChange(of: password) { _, _ in
+            errorMessage = nil
+        }
+        .onChange(of: mode) { _, _ in
+            errorMessage = nil
+        }
+    }
+
+    private var formView: some View {
         ScrollView {
             VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    ProfileAvatarView(imageData: nil, size: 64)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
                 VStack(alignment: .leading, spacing: 16) {
                     Picker("인증 모드", selection: $mode) {
                         ForEach(AuthScreenMode.allCases) { mode in
@@ -60,7 +69,7 @@ struct SignUpView: View {
                             .autocorrectionDisabled()
                             .padding(14)
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-                        
+
                         if mode == .signUp {
                             HStack(spacing: 8) {
                                 Image(systemName: isPasswordValid ? "checkmark.circle.fill" : "xmark.circle.fill")
@@ -128,16 +137,7 @@ struct SignUpView: View {
             }
             .padding(20)
         }
-        .background(Color(.systemGroupedBackground))
-        .onChange(of: email) { _, _ in
-            errorMessage = nil
-        }
-        .onChange(of: password) { _, _ in
-            errorMessage = nil
-        }
-        .onChange(of: mode) { _, _ in
-            errorMessage = nil
-        }
+        .transition(.opacity)
     }
 
     private func signUp() {
