@@ -8,69 +8,54 @@ struct WorkspaceSetupView: View {
     @State private var workspaceName = ""
     @State private var errorMessage: String?
     @State private var isSubmitting = false
+    @FocusState private var isNameFocused: Bool
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("워크스페이스 만들기")
-                        .font(.largeTitle.bold())
+            VStack(alignment: .leading, spacing: 28) {
+                WorkspaceHeroSection(
+                    eyebrow: "Create",
+                    title: "Create your workspace",
+                    subtitle: "Start a new shared memory space with friends and family.",
+                    symbol: "sparkles"
+                )
 
-                    Text("친구와 함께 사용할 첫 캘린더 공간 이름을 정해주세요.")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("워크스페이스 이름")
-                            .font(.subheadline.weight(.semibold))
-
+                WorkspaceSurfaceCard {
+                    WorkspaceFieldShell(
+                        title: "Workspace Name",
+                        hint: "다른 멤버가 한눈에 알아볼 수 있는 이름이 좋아요.",
+                        icon: "person.3.sequence.fill",
+                        isFocused: isNameFocused
+                    ) {
                         TextField("예: 우리 추억 캘린더", text: $workspaceName)
-                            .padding(14)
-                            .background(
-                                Color(.secondarySystemBackground),
-                                in: RoundedRectangle(cornerRadius: 14)
-                            )
+                            .focused($isNameFocused)
                     }
 
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(.red)
+                            .padding(.horizontal, 2)
                     }
 
-                    Button {
+                    WorkspacePrimaryButton(
+                        title: "Start Workspace",
+                        isLoading: isSubmitting,
+                        isDisabled: isSubmitting
+                    ) {
                         createWorkspace()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isSubmitting {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Text("워크스페이스 시작")
-                                    .fontWeight(.semibold)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 14)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 14))
-                    .disabled(isSubmitting)
                 }
-                .padding(20)
-                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 24))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                )
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 32)
         }
-        .background(Color(.systemGroupedBackground))
+        .scrollIndicators(.hidden)
+        .background(WorkspaceOnboardingBackground())
+        .onTapGesture {
+            isNameFocused = false
+        }
     }
 
     private func createWorkspace() {
