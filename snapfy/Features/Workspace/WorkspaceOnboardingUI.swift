@@ -1,16 +1,21 @@
 import SwiftUI
 
+enum WorkspaceOnboardingPresentation {
+    case fullScreen
+    case popup
+}
+
 enum WorkspaceOnboardingPalette {
-    static let primary = Color(red: 0.24, green: 0.73, blue: 0.52)
-    static let secondary = Color(red: 0.56, green: 0.87, blue: 0.74)
-    static let mintGlow = Color(red: 0.78, green: 0.95, blue: 0.89)
-    static let backgroundTop = Color(red: 0.97, green: 1.00, blue: 0.99)
-    static let backgroundBottom = Color(red: 0.94, green: 0.98, blue: 0.96)
+    static let primary = Color(red: 0.96, green: 0.58, blue: 0.48)
+    static let secondary = Color(red: 0.99, green: 0.72, blue: 0.60)
+    static let mintGlow = Color(red: 1.00, green: 0.88, blue: 0.82)
+    static let backgroundTop = Color(red: 1.00, green: 0.98, blue: 0.97)
+    static let backgroundBottom = Color(red: 0.99, green: 0.95, blue: 0.93)
     static let cardTint = Color.white.opacity(0.72)
     static let border = Color.white.opacity(0.55)
-    static let fieldBorder = Color(red: 0.72, green: 0.87, blue: 0.80)
-    static let fieldFocus = Color(red: 0.34, green: 0.79, blue: 0.60)
-    static let subtitle = Color(red: 0.28, green: 0.37, blue: 0.33)
+    static let fieldBorder = Color(red: 0.96, green: 0.80, blue: 0.72)
+    static let fieldFocus = Color(red: 0.95, green: 0.52, blue: 0.44)
+    static let subtitle = Color(red: 0.38, green: 0.30, blue: 0.30)
 }
 
 struct WorkspaceOnboardingBackground: View {
@@ -56,42 +61,6 @@ struct WorkspaceOnboardingBackground: View {
                 .offset(x: 160, y: -100)
         }
         .ignoresSafeArea()
-    }
-}
-
-struct WorkspaceHeroSection: View {
-    let eyebrow: String
-    let title: String
-    let subtitle: String
-    let symbol: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.subheadline.weight(.semibold))
-                Text(eyebrow)
-                    .font(.subheadline.weight(.semibold))
-            }
-            .foregroundStyle(WorkspaceOnboardingPalette.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(WorkspaceOnboardingPalette.primary.opacity(0.12))
-            )
-
-            Text(title)
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.black.opacity(0.86))
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(subtitle)
-                .font(.body)
-                .foregroundStyle(WorkspaceOnboardingPalette.subtitle)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -208,5 +177,23 @@ struct WorkspacePrimaryButton: View {
         .shadow(color: WorkspaceOnboardingPalette.primary.opacity(0.35), radius: 14, y: 10)
         .opacity(isDisabled ? 0.6 : 1)
         .disabled(isDisabled)
+    }
+}
+
+struct WorkspaceCenteredPopup<Content: View>: View {
+    let onClose: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.18)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
+
+            content
+                .frame(maxWidth: 380)
+                .padding(.horizontal, 14)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 }

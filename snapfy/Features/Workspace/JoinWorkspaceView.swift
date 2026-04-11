@@ -8,15 +8,15 @@ private enum InviteInputMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .link: return "Link"
-        case .code: return "Code"
+        case .link: return "링크"
+        case .code: return "코드"
         }
     }
 
     var placeholder: String {
         switch self {
-        case .link: return "https://snapfy.app/invite/..."
-        case .code: return "ABC123"
+        case .link: return "초대 링크를 입력하세요"
+        case .code: return "초대 코드를 입력하세요"
         }
     }
 
@@ -33,72 +33,89 @@ struct JoinWorkspaceView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var workspaceStore: WorkspaceStore
 
+    let presentation: WorkspaceOnboardingPresentation
+    let onDismiss: (() -> Void)?
+
     @State private var inputMode: InviteInputMode = .link
     @State private var inviteInput = ""
     @State private var errorMessage: String?
     @State private var isSubmitting = false
     @FocusState private var isInputFocused: Bool
 
+    init(
+        presentation: WorkspaceOnboardingPresentation = .fullScreen,
+        onDismiss: (() -> Void)? = nil
+    ) {
+        self.presentation = presentation
+        self.onDismiss = onDismiss
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    WorkspaceHeroSection(
-                        eyebrow: "Join",
-                        title: "Join a shared space",
-                        subtitle: "Enter an invite link or code to continue.",
-                        symbol: "person.2.fill"
-                    )
-
-                    WorkspaceSurfaceCard {
-                        WorkspaceModePicker(mode: $inputMode)
-
-                        WorkspaceFieldShell(
-                            title: inputMode == .link ? "Invite Link" : "Invite Code",
-                            hint: inputMode.helper,
-                            icon: inputMode == .link ? "link" : "number.square.fill",
-                            isFocused: isInputFocused
-                        ) {
-                            TextField(inputMode.placeholder, text: $inviteInput)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .focused($isInputFocused)
+        Group {
+            switch presentation {
+            case .fullScreen:
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            contentCard
                         }
-
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                                .padding(.horizontal, 2)
-                        }
-
-                        WorkspacePrimaryButton(
-                            title: "Join Workspace",
-                            isLoading: isSubmitting,
-                            isDisabled: isSubmitting
-                        ) {
-                            joinWorkspace()
-                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, 36)
                     }
+                    .scrollIndicators(.hidden)
+                    .background(WorkspaceOnboardingBackground())
+                    .toolbar(.hidden, for: .navigationBar)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 36)
+
+            case .popup:
+                contentCard
+                    .padding(8)
             }
-            .scrollIndicators(.hidden)
-            .background(WorkspaceOnboardingBackground())
-            .onTapGesture {
-                isInputFocused = false
+        }
+        .onTapGesture {
+            isInputFocused = false
+        }
+    }
+
+    private var contentCard: some View {
+        WorkspaceSurfaceCard {
+            WorkspaceModePicker(mode: $inputMode)
+
+            WorkspaceFieldShell(
+                title: inputMode == .link ? "초대 링크" : "초대 코드",
+                hint: inputMode.helper,
+                icon: inputMode == .link ? "link" : "number.square.fill",
+                isFocused: isInputFocused
+            ) {
+                TextField(inputMode.placeholder, text: $inviteInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($isInputFocused)
             }
-            .navigationTitle("공간 참여하기")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") {
-                        dismiss()
-                    }
-                }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 2)
             }
+
+            WorkspacePrimaryButton(
+                title: "캘린더 참여",
+                isLoading: isSubmitting,
+                isDisabled: isSubmitting
+            ) {
+                joinWorkspace()
+            }
+        }
+    }
+
+    private func closeView() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
         }
     }
 
@@ -115,7 +132,7 @@ struct JoinWorkspaceView: View {
 
             do {
                 try await workspaceStore.joinWorkspace(withInput: inviteInput, userID: userID)
-                dismiss()
+                closeView()
             } catch let error as WorkspaceError {
                 errorMessage = error.errorDescription
             } catch {
