@@ -46,6 +46,18 @@ struct WorkspaceListView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack {
+                    Image("SnapfyLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 102)
+                        .accessibilityLabel("Snapfy")
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 4)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     if workspaceStore.canCreateWorkspace {
