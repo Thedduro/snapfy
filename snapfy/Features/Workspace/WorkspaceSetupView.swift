@@ -5,72 +5,83 @@ struct WorkspaceSetupView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var workspaceStore: WorkspaceStore
 
+    let presentation: WorkspaceOnboardingPresentation
+    let onDismiss: (() -> Void)?
+
     @State private var workspaceName = ""
     @State private var errorMessage: String?
     @State private var isSubmitting = false
+    @FocusState private var isNameFocused: Bool
+
+    init(
+        presentation: WorkspaceOnboardingPresentation = .fullScreen,
+        onDismiss: (() -> Void)? = nil
+    ) {
+        self.presentation = presentation
+        self.onDismiss = onDismiss
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("워크스페이스 만들기")
-                        .font(.largeTitle.bold())
-
-                    Text("친구와 함께 사용할 첫 캘린더 공간 이름을 정해주세요.")
-                        .foregroundStyle(.secondary)
+        Group {
+            switch presentation {
+            case .fullScreen:
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        contentCard
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 32)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .scrollIndicators(.hidden)
+                .background(WorkspaceOnboardingBackground())
+                .toolbar(.hidden, for: .navigationBar)
 
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("워크스페이스 이름")
-                            .font(.subheadline.weight(.semibold))
-
-                        TextField("예: 우리 추억 캘린더", text: $workspaceName)
-                            .padding(14)
-                            .background(
-                                Color(.secondarySystemBackground),
-                                in: RoundedRectangle(cornerRadius: 14)
-                            )
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-
-                    Button {
-                        createWorkspace()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isSubmitting {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Text("워크스페이스 시작")
-                                    .fontWeight(.semibold)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 14))
-                    .disabled(isSubmitting)
-                }
-                .padding(20)
-                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 24))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                )
+            case .popup:
+                contentCard
+                    .padding(8)
             }
-            .padding(20)
         }
-        .background(Color(.systemGroupedBackground))
+        .onTapGesture {
+            isNameFocused = false
+        }
+    }
+
+    private var contentCard: some View {
+        WorkspaceSurfaceCard {
+            WorkspaceFieldShell(
+                title: "캘린더 이름",
+                hint: "다른 멤버가 한눈에 알아볼 수 있는 이름이 좋아요.",
+                icon: "person.3.sequence.fill",
+                isFocused: isNameFocused
+            ) {
+                TextField("예: 우리 추억 캘린더", text: $workspaceName)
+                    .focused($isNameFocused)
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 2)
+            }
+
+            WorkspacePrimaryButton(
+                title: "캘린더 시작",
+                isLoading: isSubmitting,
+                isDisabled: isSubmitting
+            ) {
+                createWorkspace()
+            }
+        }
+    }
+
+    private func closeView() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
     }
 
     private func createWorkspace() {
@@ -89,7 +100,7 @@ struct WorkspaceSetupView: View {
                     name: workspaceName,
                     ownerUserID: userID
                 )
-                dismiss()
+                closeView()
             } catch let error as WorkspaceError {
                 errorMessage = error.errorDescription
             } catch {

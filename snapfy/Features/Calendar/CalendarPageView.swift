@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-private enum MediaSource: Identifiable {
+enum MediaSource: Identifiable {
     case camera
     case library
 
@@ -22,7 +22,7 @@ private enum MediaSource: Identifiable {
     }
 }
 
-private struct SelectedDay: Identifiable {
+struct SelectedDay: Identifiable {
     let date: Date
 
     var id: String {
@@ -38,7 +38,6 @@ struct CalendarPageView: View {
     @State private var selectedDate = Date()
     @State private var monthEntries: [WorkspaceMediaItem] = []
     @State private var isLoadingMonth = false
-    @State private var showingMediaOptions = false
     @State private var activeSource: MediaSource?
     @State private var presentedMediaDay: SelectedDay?
     @State private var shareItems: [Any] = []
@@ -73,23 +72,17 @@ struct CalendarPageView: View {
                             day: day,
                             isCurrentMonth: CalendarDateUtils.isInMonth(day, month: displayedMonth),
                             isSelected: CalendarDateUtils.isSameDay(day, selectedDate),
+                            isEmptyDay: dayEntries.isEmpty,
                             thumbnailURL: dayPreviewURL,
                             isVideo: dayPrimaryEntry?.mediaType == "video",
-                            isShowingOptions: showingMediaOptions && CalendarDateUtils.isSameDay(day, selectedDate),
                             onTap: {
-                                let wasSelectedDay = CalendarDateUtils.isSameDay(day, selectedDate)
                                 selectedDate = day
-
-                                if dayEntries.isEmpty {
-                                    if wasSelectedDay, showingMediaOptions {
-                                        showingMediaOptions = false
-                                    } else {
-                                        showingMediaOptions = true
-                                    }
-                                } else {
-                                    showingMediaOptions = false
+                                if !dayEntries.isEmpty {
                                     presentedMediaDay = SelectedDay(date: day)
                                 }
+                            },
+                            onPrepareMenu: {
+                                selectedDate = day
                             },
                             onSelectCamera: {
                                 selectedDate = day
@@ -106,15 +99,24 @@ struct CalendarPageView: View {
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: 160)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        showingMediaOptions = false
-                    }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 16)
-        }
-        .overlay {
-            CalendarLoadingOverlay(isVisible: isLoadingMonth)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 30)
+                    .onEnded { value in
+                        if value.translation.width < -40 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                shiftMonth(by: 1)
+                            }
+                        } else if value.translation.width > 40 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                shiftMonth(by: -1)
+                            }
+                        }
+                    }
+            )
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -128,7 +130,6 @@ struct CalendarPageView: View {
         .onChange(of: displayedMonth) { _, newValue in
             if !CalendarDateUtils.isInMonth(selectedDate, month: newValue) {
                 selectedDate = newValue
-                showingMediaOptions = false
             }
             Task {
                 await loadMonthEntriesIfPossible(month: newValue)
@@ -152,14 +153,18 @@ struct CalendarPageView: View {
                 handleMediaResult(result, for: selectedDate)
             }
         }
-        .sheet(item: $presentedMediaDay) { selectedDay in
+        .fullScreenCover(item: $presentedMediaDay) { selectedDay in
             DayMediaViewerSheet(
                 date: selectedDay.date,
                 entries: entries(for: selectedDay.date),
                 onPick: { result in
                     handleMediaResult(result, for: selectedDay.date)
+                },
+                onDismiss: {
+                    presentedMediaDay = nil
                 }
             )
+            .presentationBackground(.clear)
         }
         .alert(
             "공유할 수 없습니다",
@@ -194,28 +199,22 @@ struct CalendarPageView: View {
     }
 
     private var monthHeader: some View {
-        HStack {
-            Button {
-                shiftMonth(by: -1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .frame(width: 36, height: 36)
-            }
-
-            Spacer()
-
+        ZStack {
             Text(CalendarDateUtils.monthTitle(for: displayedMonth))
                 .font(.title3.bold())
-
-            Spacer()
-
-            Button {
-                shiftMonth(by: 1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .frame(width: 36, height: 36)
+            
+            HStack {
+                Spacer()
+                if isLoadingMonth {
+                    ProgressView()
+                        .controlSize(.regular)
+                        .padding(.trailing, 20)
+                        .transition(.opacity)
+                }
             }
         }
+        .padding(.bottom, 8)
+        .animation(.easeInOut(duration: 0.2), value: isLoadingMonth)
     }
 
     private func shiftMonth(by value: Int) {
@@ -223,7 +222,6 @@ struct CalendarPageView: View {
     }
 
     private func openMediaSource(_ source: MediaSource) {
-        showingMediaOptions = false
         activeSource = nil
         activeSource = source
     }
@@ -331,10 +329,11 @@ private struct CalendarDayCell: View {
     let day: Date
     let isCurrentMonth: Bool
     let isSelected: Bool
+    let isEmptyDay: Bool
     let thumbnailURL: String?
     let isVideo: Bool
-    let isShowingOptions: Bool
     let onTap: () -> Void
+    let onPrepareMenu: () -> Void
     let onSelectCamera: () -> Void
     let onSelectLibrary: () -> Void
 
@@ -342,70 +341,88 @@ private struct CalendarDayCell: View {
     private let cellHeight: CGFloat = 88
 
     var body: some View {
-        Button(action: onTap) {
-            GeometryReader { proxy in
-                let cellSize = proxy.size
-
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(isSelected ? Color.black.opacity(0.14) : Color(.secondarySystemBackground))
-
-                    if let thumbnailURL,
-                       let url = URL(string: thumbnailURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: cellSize.width, height: cellSize.height)
-                                    .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                            default:
-                                EmptyView()
-                            }
-                        }
-                    }
-
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(borderColor, lineWidth: isSelected ? 2 : 0)
-
-                    Text(CalendarDateUtils.dayNumber(for: day))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(dayNumberColor)
-                        .padding(10)
-
-                    if isVideo {
-                        Image(systemName: "video.fill")
-                            .font(.caption2)
-                            .padding(6)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .padding(6)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    }
+        Group {
+            if isEmptyDay {
+                Menu {
+                    menuContent
+                } label: {
+                    cellContent
                 }
-                .frame(width: cellSize.width, height: cellSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        onPrepareMenu()
+                    }
+                )
+            } else {
+                Button(action: onTap) {
+                    cellContent
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
         }
         .buttonStyle(.plain)
-        .overlay(alignment: .top) {
-            if isShowingOptions {
-                CalendarDayActionBubble(
-                    date: day,
-                    showsCamera: UIImagePickerController.isSourceTypeAvailable(.camera),
-                    onSelectCamera: onSelectCamera,
-                    onSelectLibrary: onSelectLibrary
-                )
-                .offset(y: -cellHeight - 10)
-                .transition(.scale(scale: 0.95).combined(with: .opacity))
-                .zIndex(10)
+    }
+
+    @ViewBuilder
+    private var menuContent: some View {
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            Button("카메라", systemImage: "camera") {
+                onSelectCamera()
             }
         }
-        .zIndex(isShowingOptions ? 10 : 0)
+
+        Button("갤러리", systemImage: "photo.on.rectangle") {
+            onSelectLibrary()
+        }
+    }
+
+    private var cellContent: some View {
+        GeometryReader { proxy in
+            let cellSize = proxy.size
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(isSelected ? Color.black.opacity(0.14) : Color(.secondarySystemBackground))
+
+                if let thumbnailURL,
+                   let url = URL(string: thumbnailURL) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: cellSize.width, height: cellSize.height)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                        default:
+                            EmptyView()
+                        }
+                    }
+                }
+
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(borderColor, lineWidth: isSelected ? 2 : 0)
+
+                Text(CalendarDateUtils.dayNumber(for: day))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(dayNumberColor)
+                    .padding(10)
+
+                if isVideo {
+                    Image(systemName: "video.fill")
+                        .font(.caption2)
+                        .padding(6)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .padding(6)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
+            }
+            .frame(width: cellSize.width, height: cellSize.height)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+        .frame(maxWidth: .infinity, minHeight: cellHeight, maxHeight: cellHeight)
     }
 
     private var dayNumberColor: Color {
@@ -429,170 +446,7 @@ private struct CalendarDayCell: View {
     }
 }
 
-private struct CalendarDayActionBubble: View {
-    let date: Date
-    let showsCamera: Bool
-    let onSelectCamera: () -> Void
-    let onSelectLibrary: () -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(date.formatted(.dateTime.month().day()))
-                .font(.subheadline.weight(.semibold))
-
-            if showsCamera {
-                Button(action: onSelectCamera) {
-                    Label("카메라", systemImage: "camera")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-            }
-
-            Button(action: onSelectLibrary) {
-                Label("갤러리", systemImage: "photo.on.rectangle")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(12)
-        .frame(width: 170)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(alignment: .bottom) {
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.caption)
-                .foregroundStyle(.thinMaterial)
-                .offset(y: 12)
-        }
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
-    }
-}
-
-private struct DayMediaViewerSheet: View {
-    let date: Date
-    let entries: [WorkspaceMediaItem]
-    let onPick: (MediaPickerResult) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var activeSource: MediaSource?
-    @State private var selectedIndex = 0
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                if entries.isEmpty {
-                    ContentUnavailableView("미디어가 없습니다", systemImage: "photo.on.rectangle")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    TabView(selection: $selectedIndex) {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                            DayMediaPage(entry: entry)
-                                .tag(index)
-                                .padding(.horizontal, 12)
-                        }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .automatic))
-                    .frame(maxWidth: .infinity, maxHeight: 440)
-
-                    HStack {
-                        Text("\(selectedIndex + 1) / \(entries.count)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Text(date.formatted(.dateTime.year().month().day()))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 20)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 18)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .principal) {
-                    Text(date.formatted(.dateTime.month().day()))
-                        .font(.headline)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                            Button("카메라", systemImage: "camera") {
-                                activeSource = .camera
-                            }
-                        }
-
-                        Button("갤러리", systemImage: "photo.on.rectangle") {
-                            activeSource = .library
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-        }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .sheet(item: $activeSource, onDismiss: {
-            activeSource = nil
-        }) { source in
-            MediaPickerSheet(source: source) { result in
-                onPick(result)
-            }
-        }
-        .onChange(of: entries.count) { _, newCount in
-            if newCount == 0 {
-                selectedIndex = 0
-            } else if selectedIndex >= newCount {
-                selectedIndex = max(0, newCount - 1)
-            } else {
-                selectedIndex = 0
-            }
-        }
-    }
-}
-
-private struct DayMediaPage: View {
-    let entry: WorkspaceMediaItem
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color(.secondarySystemBackground))
-
-            if entry.mediaType == "video", let url = URL(string: entry.originalURL) {
-                DayMediaVideoPlayer(videoURL: url)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-            } else if let url = URL(string: entry.originalURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                    case .failure:
-                        ContentUnavailableView("이미지를 불러올 수 없습니다", systemImage: "photo")
-                    default:
-                        ProgressView()
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
 
 private struct DayMediaVideoPlayer: View {
     let videoURL: URL
@@ -609,29 +463,14 @@ private struct DayMediaVideoPlayer: View {
     }
 }
 
-private struct CalendarLoadingOverlay: View {
-    let isVisible: Bool
 
-    var body: some View {
-        if isVisible {
-            VStack {
-                ProgressView("캘린더 동기화 중")
-                    .padding(12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .padding(.top, 16)
-            .allowsHitTesting(false)
-        }
-    }
-}
 
-private enum MediaPickerResult {
+enum MediaPickerResult {
     case image(UIImage)
     case video(URL)
 }
 
-private struct MediaPickerSheet: UIViewControllerRepresentable {
+struct MediaPickerSheet: UIViewControllerRepresentable {
     let source: MediaSource
     let onPick: (MediaPickerResult) -> Void
 

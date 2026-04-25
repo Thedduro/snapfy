@@ -18,7 +18,7 @@ enum FirestoreMediaError: LocalizedError {
         case .missingThumbnail:
             return "썸네일 생성에 실패했습니다."
         case .invalidWorkspace:
-            return "워크스페이스 정보가 올바르지 않습니다."
+            return "캘린더 정보가 올바르지 않습니다."
         case .invalidUser:
             return "사용자 정보를 확인할 수 없습니다."
         }

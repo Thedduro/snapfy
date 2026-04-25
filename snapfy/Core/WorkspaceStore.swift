@@ -285,8 +285,8 @@ final class WorkspaceStore: ObservableObject, WorkspaceManaging {
         }
 
         let nsError = error as NSError
-        print("Workspace Firestore error:", nsError.domain, nsError.code, nsError.localizedDescription)
-        print("Workspace Firestore userInfo:", nsError.userInfo)
+        print("Calendar Firestore error:", nsError.domain, nsError.code, nsError.localizedDescription)
+        print("Calendar Firestore userInfo:", nsError.userInfo)
         if nsError.domain == FirestoreErrorDomain,
            let code = FirestoreErrorCode.Code(rawValue: nsError.code) {
             switch code {
@@ -314,21 +314,21 @@ enum WorkspaceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidName:
-            return "워크스페이스 이름은 2자 이상 입력해주세요."
+            return "캘린더 이름은 2자 이상 입력해주세요."
         case .invalidInvite:
             return "유효한 초대 링크가 아닙니다."
         case .workspaceLimitReached:
-            return "워크스페이스는 최대 5개까지 만들 수 있습니다."
+            return "캘린더는 최대 5개까지 만들 수 있습니다."
         case .workspaceNotFound:
-            return "현재 워크스페이스를 찾을 수 없습니다."
+            return "현재 캘린더를 찾을 수 없습니다."
         case .authenticationRequired:
             return "로그인이 필요합니다. 다시 로그인해주세요."
         case .permissionDenied:
-            return "권한이 없어 워크스페이스를 처리할 수 없습니다. 로그인 상태 또는 Firestore 규칙을 확인해주세요."
+            return "권한이 없어 캘린더를 처리할 수 없습니다. 로그인 상태 또는 Firestore 규칙을 확인해주세요."
         case .firestore(let message):
             return message
         case .unknown:
-            return "워크스페이스를 처리하지 못했습니다."
+            return "캘린더를 처리하지 못했습니다."
         }
     }
 }
